@@ -14,7 +14,7 @@ import java.util.logging.Logger;
 public class ClientInterface {
     private OutputStreamWriter osw;
     private Scanner scanner;
-    private Socket clientSocket;
+    private final Socket clientSocket;
     private Key clientKey = new Key();
 
     private static final Logger LOGGER = Logger.getLogger(Thread.currentThread().getName() + ":" + ClientInterface.class.getName());
@@ -37,26 +37,27 @@ public class ClientInterface {
         for (int i = 0; i < intString.length; i++) {
             intString[i] = (int) chars[i];
         }
+
+        //todo
     }
 
     public Key init() {
         Key clientKey = null;
         List<String> request = readFromClient();
-        if (!request.isEmpty()) {
-            if (request.getFirst().equals("GET SERVER KEY")) {
-                List<String> lines = new ArrayList<>();
-                lines.add(String.valueOf(RSAServerKeys.getPublicKey().getKey()[0]));
-                lines.add(String.valueOf(RSAServerKeys.getPublicKey().getKey()[1]));
-                lines.add(String.valueOf(RSAServerKeys.getPublicKey().getMeta()[0]));
-                lines.add(String.valueOf(RSAServerKeys.getPublicKey().getMeta()[1]));
-                writeToClient(lines);
-                 readFromClient();
-            }
-        }
-        else {
-            LOGGER.warning("Request is null");
-        }
+        if (!request.isEmpty()){
+            handleRequest(request.getFirst());
+        } else LOGGER.warning("Request is null");
         return clientKey;
+    }
+
+    private void handleRequest(String line) {
+        switch (line) {
+            case "GET RSA KEY" -> {
+                writeToClient(RSAServerKeys.getPublicKey().toString());
+                readFromClient();
+            }
+            case "321" -> System.out.println("123");
+        }
     }
 
     public List<String> readFromClient() {

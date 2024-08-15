@@ -1,26 +1,25 @@
 package com.github.rob269.rsa;
 
+import com.github.rob269.User;
 import com.github.rob269.io.ResourcesInterface;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
 
 import java.math.BigInteger;
 import java.util.logging.Logger;
 
 public class RSAServerKeys {
-    private static final Key publicKey = new Key();
-    private static final Key privateKey = new Key();
+    private static RSAKeys serverKeys;
+    private static final User SERVER = new User("#SERVER#");
 
     private static final Logger LOGGER = Logger.getLogger(Thread.currentThread().getName() + ":" + RSAServerKeys.class.getName());
 
     public static void initKeys() {
         if (ResourcesInterface.isExist("RSA/serverKeys.json")) {
             try {
-                JSONObject serverKeys = ResourcesInterface.readJSON("RSA/serverKeys.json");
-                publicKey.setKey(new BigInteger[]{new BigInteger((String) ((JSONArray) serverKeys.get("publicKey")).get(0)),
-                        new BigInteger((String) ((JSONArray) serverKeys.get("publicKey")).get(1))});
-                privateKey.setKey(new BigInteger[]{new BigInteger((String) ((JSONArray) serverKeys.get("privateKey")).get(0)),
-                        new BigInteger((String) ((JSONArray) serverKeys.get("privateKey")).get(1))});
+                RSAKeys serverKeys = ResourcesInterface.readJSON("RSA/serverKeys.json", RSAKeys.class);
+                if (serverKeys == null || serverKeys.getUser() == null) {
+                    throw new NullPointerException();
+                }
+                RSAServerKeys.serverKeys = serverKeys;
                 LOGGER.fine("The keys have been read");
             } catch (NullPointerException e) {
                 LOGGER.warning("Keys not found");
@@ -34,27 +33,17 @@ public class RSAServerKeys {
     }
 
     private static void writeNewKeys() {
-        BigInteger[][] keys = RSA.generateKeys();
-        publicKey.setKey(keys[0]);
-        privateKey.setKey(keys[1]);
-        JSONObject serverKeysJSON = new JSONObject();
-        JSONArray publicKeyJSONArray = new JSONArray();
-        JSONArray privateKeyJSONArray = new JSONArray();
-        publicKeyJSONArray.add(String.valueOf(publicKey.getKey()[0]));
-        publicKeyJSONArray.add(String.valueOf(publicKey.getKey()[1]));
-        privateKeyJSONArray.add(String.valueOf(privateKey.getKey()[0]));
-        privateKeyJSONArray.add(String.valueOf(privateKey.getKey()[1]));
-        serverKeysJSON.put("publicKey", publicKeyJSONArray);
-        serverKeysJSON.put("privateKey", privateKeyJSONArray);
-        ResourcesInterface.writeJSON("RSA/serverKeys.json", serverKeysJSON);
+        BigInteger[][] keys = RSA.generateKeys(512);
+        RSAServerKeys.serverKeys = new RSAKeys(keys, SERVER);
+        ResourcesInterface.writeJSON("RSA/serverKeys.json", serverKeys);
         LOGGER.fine("The keys were generated and written down");
     }
 
     public static Key getPublicKey() {
-        return publicKey;
+        return serverKeys.getPublicKey();
     }
 
     public static Key getPrivateKey() {
-        return privateKey;
+        return serverKeys.getPrivateKey();
     }
 }
