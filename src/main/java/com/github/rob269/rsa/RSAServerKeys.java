@@ -9,8 +9,7 @@ import java.util.logging.Logger;
 public class RSAServerKeys {
     private static RSAKeys serverKeys;
     private static final User SERVER = new User("#SERVER#");
-
-    private static final Logger LOGGER = Logger.getLogger(Thread.currentThread().getName() + ":" + RSAServerKeys.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(RSAServerKeys.class.getName());
 
     public static void initKeys() {
         if (ResourcesInterface.isExist("RSA/serverKeys.json")) {
@@ -33,7 +32,7 @@ public class RSAServerKeys {
     }
 
     private static void writeNewKeys() {
-        BigInteger[][] keys = RSA.generateKeys(512);
+        BigInteger[][] keys = RSA.generateKeys();
         RSAServerKeys.serverKeys = new RSAKeys(keys, SERVER);
         ResourcesInterface.writeJSON("RSA/serverKeys.json", serverKeys);
         LOGGER.fine("The keys were generated and written down");

@@ -10,12 +10,13 @@ import java.util.List;
 import java.util.logging.Logger;
 
 public class ResourcesInterface {
-    private static final Logger LOGGER = Logger.getLogger(Thread.currentThread().getName() + ":" + ResourcesInterface.class.getName());
-    public static final String ROOT_FOLDER = "resources/";
+    private static final Logger LOGGER = Logger.getLogger(ResourcesInterface.class.getName());
+    public static final String RESOURCES_FOLDER = "resources/";
+    public static final String EXTENSION = ".json";
 
     public static List<String> read(String filePath) {
         List<String> lines = new ArrayList<>();
-        File file = new File(ROOT_FOLDER + filePath);
+        File file = new File(RESOURCES_FOLDER + filePath);
         if (file.exists()) {
             try {
                 BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8));
@@ -35,7 +36,7 @@ public class ResourcesInterface {
     }
 
     public synchronized static void write(String filePath, List<String> lines, boolean append) {
-        File file = new File(ROOT_FOLDER + filePath);
+        File file = new File(RESOURCES_FOLDER + filePath);
         if (file.getParentFile().exists()) {
             file.getParentFile().mkdirs();
         }
@@ -43,13 +44,14 @@ public class ResourcesInterface {
             try {
                 file.createNewFile();
             } catch (IOException e) {
-                LOGGER.warning("Can't create new file (" + filePath + ") " + e);
+                LOGGER.warning("Can't create new file (" + filePath + ") ");
+                e.printStackTrace();
             }
         }
         try {
             BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, append), StandardCharsets.UTF_8));
-            for (int i = 0; i < lines.size(); i++) {
-                bufferedWriter.write(lines.get(i) + "\n");
+            for (String line : lines) {
+                bufferedWriter.write(line + "\n");
             }
             bufferedWriter.flush();
             bufferedWriter.close();
@@ -63,11 +65,11 @@ public class ResourcesInterface {
     }
 
     public static boolean isExist(String filePath) {
-        return new File(ROOT_FOLDER + filePath).exists();
+        return new File(RESOURCES_FOLDER + filePath).exists();
     }
 
     public synchronized static void writeJSON(String filePath, Object object) {
-        File file = new File(ROOT_FOLDER + filePath);
+        File file = new File(RESOURCES_FOLDER + filePath);
         if (!file.getParentFile().exists()) {
             file.getParentFile().mkdirs();
         }
@@ -75,31 +77,32 @@ public class ResourcesInterface {
             try {
                 file.createNewFile();
             } catch (IOException e) {
-                LOGGER.warning("Can't create new file (" + ROOT_FOLDER + filePath + ") " + e);
+                LOGGER.warning("Can't create new file (" + RESOURCES_FOLDER + filePath + ") " + e);
             }
         }
         try {
             BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8));
             GsonBuilder builder = new GsonBuilder();
             builder.setPrettyPrinting();
+            builder.serializeNulls();
             Gson gson = builder.create();
             bufferedWriter.write(gson.toJson(object));
             bufferedWriter.flush();
             bufferedWriter.close();
         } catch (IOException e) {
-            LOGGER.warning("Can't write to file (" + ROOT_FOLDER + filePath + ") " + e);
+            LOGGER.warning("Can't write to file (" + RESOURCES_FOLDER + filePath + ") " + e);
         }
     }
 
     public static <T> T readJSON(String filePath, Class<T> classOfT) {
-        File file = new File(ROOT_FOLDER + filePath);
+        File file = new File(RESOURCES_FOLDER + filePath);
         if (file.exists()) {
             try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8));){
                 Gson gson = new Gson();
                 T object = gson.fromJson(bufferedReader, classOfT);
                 return object;
             } catch (IOException e) {
-                LOGGER.warning("Can't read the file (" + ROOT_FOLDER + filePath + ") " + e);
+                LOGGER.warning("Can't read the file (" + RESOURCES_FOLDER + filePath + ") " + e);
             }
         }
         return null;

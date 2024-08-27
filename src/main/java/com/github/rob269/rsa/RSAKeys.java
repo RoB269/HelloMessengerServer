@@ -4,32 +4,25 @@ import com.github.rob269.User;
 import com.github.rob269.io.ResourcesInterface;
 import com.google.gson.annotations.SerializedName;
 
-import java.io.File;
 import java.math.BigInteger;
-import java.util.logging.Logger;
 
 public class RSAKeys {
     @SerializedName("public_key")
-    private Key publicKey;
+    private final Key publicKey;
     @SerializedName("private_key")
-    private Key privateKey;
-    private User user;
-    
-    private static final int DEFAULT_KEY_SIZE = 512;
-    private static final Logger LOGGER = Logger.getLogger(Thread.currentThread().getName() + ":" + RSAKeys.class.getName());
+    private final Key privateKey;
+    private final User user;
 
     public RSAKeys(Key publicKey, Key privateKey, User user) {
-        this.publicKey = publicKey;
-        this.privateKey = privateKey;
+        this.publicKey = addMeta(publicKey);
+        this.privateKey = addMeta(privateKey);
         this.user = user;
-        addMeta();
     }
 
     public RSAKeys(BigInteger[][] keys, User user) {
-        this.publicKey = new Key(keys[0], user);
-        this.privateKey = new Key(keys[1], user);
+        this.publicKey = addMeta(new Key(keys[0], user));
+        this.privateKey = addMeta(new Key(keys[1], user));
         this.user = user;
-        addMeta();
     }
 
     public Key getPublicKey() {
@@ -44,11 +37,9 @@ public class RSAKeys {
         return user;
     }
 
-    private void addMeta() {
-        publicKey.setMeta(new BigInteger[]{new BigInteger(RSA.encode(publicKey.getKey()[0].add(BigInteger.valueOf(user.hashCode())), Guarantor.getPrivateKey())),
-                new BigInteger(RSA.encode(publicKey.getKey()[1].add(BigInteger.valueOf(user.hashCode())), Guarantor.getPrivateKey()))});
-        privateKey.setMeta(new BigInteger[]{new BigInteger(RSA.encode(privateKey.getKey()[0].add(BigInteger.valueOf(user.hashCode())), Guarantor.getPrivateKey())),
-                new BigInteger(RSA.encode(privateKey.getKey()[1].add(BigInteger.valueOf(user.hashCode())), Guarantor.getPrivateKey()))});
+    private static Key addMeta(Key key) {
+        return key.setMeta(new BigInteger[]{new BigInteger(RSA.encode(key.getKey()[0].add(BigInteger.valueOf(key.getUser().hashCode())), Guarantor.getPrivateKey())),
+                new BigInteger(RSA.encode(key.getKey()[1].add(BigInteger.valueOf(key.getUser().hashCode())), Guarantor.getPrivateKey()))});
     }
 
     public static boolean isKey(Key key) {
@@ -59,23 +50,27 @@ public class RSAKeys {
         return one.compareTo(two) == 0 && one.compareTo(BigInteger.valueOf(key.getUser().hashCode())) == 0;
     }
 
-    public static boolean isRegistered(RSAKeys keys) {
+    public static boolean isKeys(RSAKeys keys) {
         if (isKey(keys.getPublicKey()) && isKey(keys.getPrivateKey())) {
             String a = RSA.encode(1, keys.getPublicKey());
             String b = RSA.decode(a, keys.getPrivateKey());
-            if (String.valueOf(1).equals(b)) {
-                File keyFile = new File(ResourcesInterface.ROOT_FOLDER + "RSA/clients/" + keys.getUser().getId() + ".json");
-                return keyFile.exists();
-            }
+            return "1".equals(b);
         }
         return false;
     }
 
-    public static boolean registerNewKeys(RSAKeys keys) {
+    public static boolean isIdentified(Key key) {
+        return ResourcesInterface.isExist("RSA/clients/" + key.getUser().getId() + ResourcesInterface.EXTENSION);
+    }
+
+    public static boolean registerNewKey(Key key) {
         boolean toReturn = false;
-        if (!isRegistered(keys)) {
-            ResourcesInterface.writeJSON("RSA/clients/" + keys.getUser().getId() + ".json", keys);
-            toReturn = true;
+        if (isKey(key)){
+            if (!RSAKeys.isIdentified(key)) {
+                key = addMeta(key);
+                ResourcesInterface.writeJSON("RSA/clients/" + key.getUser().getId() + ResourcesInterface.EXTENSION, key);
+                toReturn = true;
+            }
         }
         return toReturn;
     }
@@ -87,5 +82,11 @@ public class RSAKeys {
                 "private_key:\n" +
                 privateKey.toString() +
                 user.toString();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof RSAKeys keys)) return false;
+        return this.publicKey.equals(keys.publicKey) && this.privateKey.equals(keys.privateKey);
     }
 }
