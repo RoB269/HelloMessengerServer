@@ -1,6 +1,7 @@
 package com.github.rob269;
 
-import com.github.rob269.io.ClientInterface;
+import com.github.rob269.io.ClientIO;
+import com.github.rob269.io.DataBaseIO;
 import com.github.rob269.rsa.RSAServerKeys;
 import com.github.rob269.rsa.WrongKeyException;
 
@@ -14,6 +15,7 @@ import java.util.logging.Logger;
 
 //Server
 public class Main {
+    public static final DataBaseIO RSA_KEYS = new DataBaseIO(DataBaseIO.Tables.USER_RSA_KEYS);
     static {
         File logsDir = new File("log/");
         if (!logsDir.exists()) {
@@ -58,15 +60,15 @@ class ServerThread extends Thread {
         } catch (SocketException e) {
             LOGGER.warning("Time out exception");
         }
-        ClientInterface clientInterface = new ClientInterface(clientSocket);
+        ClientIO clientIO = new ClientIO(clientSocket);
         try {
-            clientInterface.init();
+            clientIO.init();
         } catch (WrongKeyException e) {
             LOGGER.warning("Wrong Key");
             e.printStackTrace();
         }
         try {
-            if (!clientInterface.isClosed()) clientInterface.close();
+            if (!clientIO.isClosed()) clientIO.close();
             LOGGER.info(clientSocket.getInetAddress() + " disconnected");
             clientSocket.close();
         } catch (IOException e) {

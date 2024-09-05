@@ -1,10 +1,14 @@
 package com.github.rob269.rsa;
 
+import com.github.rob269.Main;
 import com.github.rob269.User;
-import com.github.rob269.io.ResourcesInterface;
+import com.github.rob269.io.DataBaseIO;
+import com.github.rob269.io.ResourcesIO;
 import com.google.gson.annotations.SerializedName;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RSAKeys {
     @SerializedName("public_key")
@@ -60,17 +64,15 @@ public class RSAKeys {
     }
 
     public static boolean isIdentified(Key key) {
-        return ResourcesInterface.isExist("RSA/clients/" + key.getUser().getId() + ResourcesInterface.EXTENSION);
+        return Main.RSA_KEYS.isExist(1, key.getUser().getId());
     }
 
     public static boolean registerNewKey(Key key) {
         boolean toReturn = false;
-        if (isKey(key)){
-            if (!RSAKeys.isIdentified(key)) {
-                key = addMeta(key);
-                ResourcesInterface.writeJSON("RSA/clients/" + key.getUser().getId() + ResourcesInterface.EXTENSION, key);
-                toReturn = true;
-            }
+        if (!RSAKeys.isIdentified(key)) {
+            key = addMeta(key);
+            Main.RSA_KEYS.write(key.toString().split("\n"));
+            toReturn = true;
         }
         return toReturn;
     }

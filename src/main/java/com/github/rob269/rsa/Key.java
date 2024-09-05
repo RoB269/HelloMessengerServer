@@ -1,9 +1,11 @@
 package com.github.rob269.rsa;
 
+import com.github.rob269.Main;
 import com.github.rob269.User;
-import com.github.rob269.io.ResourcesInterface;
+import com.github.rob269.io.ResourcesIO;
 
 import java.math.BigInteger;
+import java.util.List;
 
 public class Key {
     private final BigInteger[] key = new BigInteger[2];
@@ -13,6 +15,14 @@ public class Key {
     public Key(BigInteger[] key, User user) {
         this.key[0] = key[0];
         this.key[1] = key[1];
+        this.user = user;
+    }
+
+    public Key(BigInteger[] key, BigInteger[] meta, User user) {
+        this.key[0] = key[0];
+        this.key[1] = key[1];
+        this.meta[0] = meta[0];
+        this.meta[1] = meta[1];
         this.user = user;
     }
 
@@ -37,7 +47,9 @@ public class Key {
     }
 
     public boolean isAuthenticated() {
-        Key val = ResourcesInterface.readJSON("RSA/clients/" + this.getUser().getId() + ResourcesInterface.EXTENSION, Key.class);
+        List<String> entry = Main.RSA_KEYS.readLine(5, user.getId());
+        Key val = new Key(new BigInteger[]{new BigInteger(entry.get(1)), new BigInteger(entry.get(2))},
+                new BigInteger[]{new BigInteger(entry.get(3)), new BigInteger(entry.get(4))}, new User(entry.get(5)));
         return this.equals(val);
     }
 

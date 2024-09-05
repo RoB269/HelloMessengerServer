@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
-public class ResourcesInterface {
-    private static final Logger LOGGER = Logger.getLogger(ResourcesInterface.class.getName());
+public class ResourcesIO {
+    private static final Logger LOGGER = Logger.getLogger(ResourcesIO.class.getName());
     public static final String RESOURCES_FOLDER = "resources/";
     public static final String EXTENSION = ".json";
 

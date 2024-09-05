@@ -1,7 +1,7 @@
 package com.github.rob269.rsa;
 
 import com.github.rob269.User;
-import com.github.rob269.io.ResourcesInterface;
+import com.github.rob269.io.ResourcesIO;
 
 import java.math.BigInteger;
 import java.util.logging.Logger;
@@ -12,9 +12,9 @@ public class RSAServerKeys {
     private static final Logger LOGGER = Logger.getLogger(RSAServerKeys.class.getName());
 
     public static void initKeys() {
-        if (ResourcesInterface.isExist("RSA/serverKeys.json")) {
+        if (ResourcesIO.isExist("RSA/serverKeys.json")) {
             try {
-                RSAKeys serverKeys = ResourcesInterface.readJSON("RSA/serverKeys.json", RSAKeys.class);
+                RSAKeys serverKeys = ResourcesIO.readJSON("RSA/serverKeys.json", RSAKeys.class);
                 if (serverKeys == null || serverKeys.getUser() == null) {
                     throw new NullPointerException();
                 }
@@ -34,7 +34,7 @@ public class RSAServerKeys {
     private static void writeNewKeys() {
         BigInteger[][] keys = RSA.generateKeys();
         RSAServerKeys.serverKeys = new RSAKeys(keys, SERVER);
-        ResourcesInterface.writeJSON("RSA/serverKeys.json", serverKeys);
+        ResourcesIO.writeJSON("RSA/serverKeys.json", serverKeys);
         LOGGER.fine("The keys were generated and written down");
     }
 

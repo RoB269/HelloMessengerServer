@@ -9,16 +9,16 @@ import java.net.Socket;
 import java.util.*;
 import java.util.logging.Logger;
 
-public class ClientInterface {
+public class ClientIO {
     private DataOutputStream dos;
     private DataInputStream dis;
     private Key clientKey;
     private boolean isClosed = false;
     private boolean initialized = false;
 
-    private static final Logger LOGGER = Logger.getLogger(ClientInterface.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ClientIO.class.getName());
 
-    public ClientInterface(Socket clientSocket) {
+    public ClientIO(Socket clientSocket) {
         try {
             dos = new DataOutputStream(clientSocket.getOutputStream());
             dis = new DataInputStream(clientSocket.getInputStream());
@@ -108,7 +108,7 @@ public class ClientInterface {
                     if (!RSAKeys.isIdentified(newKey)) {
                         Key keyToReturn;
                         RSAKeys.registerNewKey(newKey);
-                        keyToReturn = ResourcesInterface.readJSON("RSA/clients/" + newKey.getUser().getId() + ResourcesInterface.EXTENSION, Key.class);
+                        keyToReturn = ResourcesIO.readJSON("RSA/clients/" + newKey.getUser().getId() + ResourcesIO.EXTENSION, Key.class);
                         if (keyToReturn == null) {
                             LOGGER.warning("Key is null");
                         }
