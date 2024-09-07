@@ -1,5 +1,6 @@
 package com.github.rob269.io;
 
+import com.github.rob269.Main;
 import com.github.rob269.User;
 import com.github.rob269.rsa.*;
 
@@ -108,9 +109,11 @@ public class ClientIO {
                     if (!RSAKeys.isIdentified(newKey)) {
                         Key keyToReturn;
                         RSAKeys.registerNewKey(newKey);
-                        keyToReturn = ResourcesIO.readJSON("RSA/clients/" + newKey.getUser().getId() + ResourcesIO.EXTENSION, Key.class);
+                        keyToReturn = Key.getFromDatabase(newKey.getUser().getId());
                         if (keyToReturn == null) {
                             LOGGER.warning("Key is null");
+                            write("500 ERROR");
+                            return;
                         }
                         int i = 0;
                         StringBuilder message = new StringBuilder();

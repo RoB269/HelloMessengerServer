@@ -46,10 +46,24 @@ public class Key {
         return this;
     }
 
+    public static Key getFromDatabase(String userId) {
+        List<String> strings = Main.RSA_KEYS.readLine(6, userId);
+        if (strings.size() == 6){
+            return new Key(new BigInteger[]{
+                    new BigInteger(strings.get(1)),
+                    new BigInteger(strings.get(2))
+            }, new BigInteger[]{
+                    new BigInteger(strings.get(3)),
+                    new BigInteger(strings.get(4))
+            }, new User(strings.get(5)));
+        }
+        else {
+            return null;
+        }
+    }
+
     public boolean isAuthenticated() {
-        List<String> entry = Main.RSA_KEYS.readLine(5, user.getId());
-        Key val = new Key(new BigInteger[]{new BigInteger(entry.get(1)), new BigInteger(entry.get(2))},
-                new BigInteger[]{new BigInteger(entry.get(3)), new BigInteger(entry.get(4))}, new User(entry.get(5)));
+        Key val = getFromDatabase(user.getId());
         return this.equals(val);
     }
 

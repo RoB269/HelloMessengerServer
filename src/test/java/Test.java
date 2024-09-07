@@ -9,6 +9,5 @@ import java.math.BigInteger;
 
 public class Test {
     public static void main(String[] args) {
-        System.out.println(Main.RSA_KEYS.isExist(5, "#TEST1#"));
     }
 }
