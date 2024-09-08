@@ -32,9 +32,8 @@ public class DataBaseIO {
         this.table = table;
         columns = getMetaData("COLUMN_NAME");
     }
-    //OK
 
-    private synchronized List<String> getMetaData(String get) {//work
+    private synchronized List<String> getMetaData(String get) {
         List<String> columns = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(url, userName, password)){
             DatabaseMetaData md = connection.getMetaData();
@@ -62,7 +61,7 @@ public class DataBaseIO {
         return false;
     }
 
-    private String formatValues(String[] values) {//work
+    private String formatValues(String[] values) {
         List<String> isAutoincrement = getMetaData("IS_AUTOINCREMENT");
         List<String> dataType = getMetaData("DATA_TYPE");
         for (int i = 0; i < this.columns.size(); i++) {
@@ -101,14 +100,13 @@ public class DataBaseIO {
         return readLine(columnIndex, String.valueOf(id), true);
     }
 
-    private synchronized List<String> readLine(int columnIndex, String id, boolean isNumber) {//work
+    private synchronized List<String> readLine(int columnIndex, String id, boolean isNumber) {
         List<String> strings = new ArrayList<>();
         if (isExist(columnIndex, id)) {
             try (Connection conn = DriverManager.getConnection(url, userName, password);
                  Statement statement = conn.createStatement()) {
                 if (!isNumber) id = "'" + id + "'";
                 String sql = "SELECT * FROM %s WHERE %s=%s;".formatted(table.toString(), columns.get(columnIndex), id);
-                System.out.println(sql);
                 ResultSet set = statement.executeQuery(sql);
                 if (set.next()) {
                     for (int j = 0; j < columns.size(); j++) {
@@ -123,7 +121,7 @@ public class DataBaseIO {
         return strings;
     }
 
-    public synchronized void write(String[] values) {//work
+    public synchronized void write(String[] values) {
         try (Connection conn = DriverManager.getConnection(url, userName, password);
         Statement statement = conn.createStatement()){
 

@@ -12,24 +12,24 @@ import java.util.List;
 
 public class RSAKeys {
     @SerializedName("public_key")
-    private final Key publicKey;
+    private final UserKey publicKey;
     @SerializedName("private_key")
     private final Key privateKey;
     private final User user;
 
-    public RSAKeys(Key publicKey, Key privateKey, User user) {
+    public RSAKeys(UserKey publicKey, Key privateKey, User user) {
         this.publicKey = addMeta(publicKey);
-        this.privateKey = addMeta(privateKey);
+        this.privateKey = privateKey;
         this.user = user;
     }
 
     public RSAKeys(BigInteger[][] keys, User user) {
-        this.publicKey = addMeta(new Key(keys[0], user));
-        this.privateKey = addMeta(new Key(keys[1], user));
+        this.publicKey = addMeta(new UserKey(keys[0], user));
+        this.privateKey = new Key(keys[1]);
         this.user = user;
     }
 
-    public Key getPublicKey() {
+    public UserKey getPublicKey() {
         return publicKey;
     }
 
@@ -41,12 +41,12 @@ public class RSAKeys {
         return user;
     }
 
-    private static Key addMeta(Key key) {
+    private static UserKey addMeta(UserKey key) {
         return key.setMeta(new BigInteger[]{new BigInteger(RSA.encode(key.getKey()[0].add(BigInteger.valueOf(key.getUser().hashCode())), Guarantor.getPrivateKey())),
                 new BigInteger(RSA.encode(key.getKey()[1].add(BigInteger.valueOf(key.getUser().hashCode())), Guarantor.getPrivateKey()))});
     }
 
-    public static boolean isKey(Key key) {
+    public static boolean isKey(UserKey key) {
         BigInteger[] meta = key.getMeta();
         BigInteger[] keyData = key.getKey();
         BigInteger one = (new BigInteger(RSA.decode(meta[0], Guarantor.getPublicKey())).subtract(keyData[0]));
@@ -55,7 +55,7 @@ public class RSAKeys {
     }
 
     public static boolean isKeys(RSAKeys keys) {
-        if (isKey(keys.getPublicKey()) && isKey(keys.getPrivateKey())) {
+        if (isKey(keys.getPublicKey())) {
             String a = RSA.encode(1, keys.getPublicKey());
             String b = RSA.decode(a, keys.getPrivateKey());
             return "1".equals(b);
@@ -63,11 +63,11 @@ public class RSAKeys {
         return false;
     }
 
-    public static boolean isIdentified(Key key) {
-        return Main.RSA_KEYS.isExist(1, key.getUser().getId());
+    public static boolean isIdentified(UserKey key) {
+        return Main.RSA_KEYS.isExist(5, key.getUser().getId());
     }
 
-    public static boolean registerNewKey(Key key) {
+    public static boolean registerNewKey(UserKey key) {
         boolean toReturn = false;
         if (!RSAKeys.isIdentified(key)) {
             key = addMeta(key);

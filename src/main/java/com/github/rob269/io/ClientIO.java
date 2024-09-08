@@ -49,14 +49,16 @@ public class ClientIO {
         }
     }
 
-    private void initClientKey(Key clientKey) throws WrongKeyException{
+    private void initClientKey(UserKey clientKey) throws WrongKeyException{
         if (RSAKeys.isIdentified(clientKey) && clientKey.isAuthenticated()) {
             this.clientKey = clientKey;
             LOGGER.info("User key is approved");
             if (checkInitialization()) {
                 initialized = true;
                 LOGGER.info("YEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE");
-                close();//todo
+                //todo
+
+                close();
             }
             else {
                 LOGGER.warning("Fail initialization");
@@ -88,7 +90,7 @@ public class ClientIO {
                             new BigInteger(lines.get(1))
                     };
                     User user = new User(RSA.decodeString(lines.get(4), RSAServerKeys.getPrivateKey()));
-                    Key clientKey = new Key(keyInteger, user);
+                    UserKey clientKey = new UserKey(keyInteger, user);
                     BigInteger[] meta = new BigInteger[]{
                             new BigInteger(lines.get(2)),
                             new BigInteger(lines.get(3))
@@ -104,26 +106,19 @@ public class ClientIO {
             case "REGISTER NEW KEY" -> {
                 List<String> lines = read();
                 if (lines.size()>=3) {
-                    Key newKey = new Key(new BigInteger[]{new BigInteger(lines.getFirst()), new BigInteger(lines.get(1))},
+                    UserKey newKey = new UserKey(new BigInteger[]{new BigInteger(lines.getFirst()), new BigInteger(lines.get(1))},
                             new User(RSA.decodeString(lines.get(2), RSAServerKeys.getPrivateKey())));
                     if (!RSAKeys.isIdentified(newKey)) {
-                        Key keyToReturn;
+                        UserKey keyToReturn;
                         RSAKeys.registerNewKey(newKey);
-                        keyToReturn = Key.getFromDatabase(newKey.getUser().getId());
+                        keyToReturn = UserKey.getFromDatabase(newKey.getUser().getId());
                         if (keyToReturn == null) {
                             LOGGER.warning("Key is null");
                             write("500 ERROR");
                             return;
                         }
-                        int i = 0;
-                        StringBuilder message = new StringBuilder();
-                        for (String line : Objects.requireNonNull(keyToReturn).toString().split("\n")) {
-                            if (i < 4) {
-                                message.append(line).append("\n");
-                                i++;
-                            } else break;
-                        }
-                        write(message.toString());
+                        write("META");
+                        write(keyToReturn.getMeta()[0] + "\n" + keyToReturn.getMeta()[1] + "\n");
                     } else {
                         LOGGER.warning("Key is already registered");
                         write("KEY IS REJECTED");
