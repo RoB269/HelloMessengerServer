@@ -15,7 +15,8 @@ public class DataBaseIO {
     private final Tables table;
 
     public enum Tables {
-        USER_RSA_KEYS("user_rsa_keys");
+        USER_RSA_KEYS("user_rsa_keys"),
+        USERS("users");
         private final String str;
 
         Tables(String str) {

@@ -16,6 +16,7 @@ import java.util.logging.Logger;
 //Server
 public class Main {
     public static final DataBaseIO RSA_KEYS = new DataBaseIO(DataBaseIO.Tables.USER_RSA_KEYS);
+    public static final DataBaseIO USERS = new DataBaseIO(DataBaseIO.Tables.USERS);
     static {
         File logsDir = new File("log/");
         if (!logsDir.exists()) {

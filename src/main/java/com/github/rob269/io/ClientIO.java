@@ -121,14 +121,16 @@ public class ClientIO {
                         write(keyToReturn.getMeta()[0] + "\n" + keyToReturn.getMeta()[1] + "\n");
                     } else {
                         LOGGER.warning("Key is already registered");
-                        write("KEY IS REJECTED");
-                        close();
+                        write("KEY IS REJECTED: User already registered");
                     }
                 }
                 else {
                     LOGGER.warning("Wrong key format");
                     write("WRONG KEY FORMAT");
                 }
+            }
+            case "UPDATE KEY" -> {
+
             }
         }
     }
