@@ -17,6 +17,10 @@ public class User {
         this.id = id;
     }
 
+    public static boolean isIdentified(String userId) {
+        return Main.USERS.isExist(1, userId);
+    }
+
     @Override
     public boolean equals(Object object) {
         if (this == object) return true;

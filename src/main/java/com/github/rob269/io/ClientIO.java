@@ -7,7 +7,9 @@ import com.github.rob269.rsa.*;
 import java.io.*;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.*;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 public class ClientIO {
@@ -55,8 +57,22 @@ public class ClientIO {
             LOGGER.info("User key is approved");
             if (checkInitialization()) {
                 initialized = true;
+                List<String> login = read();
+                if (User.isIdentified(login.get(0))) {
+                    if (!Main.USERS.readLine(1, login.get(0)).get(2).equals(login.get(1))) {
+                        write("AUTHENTICATION ERROR");
+                        close();
+                        return;
+                    }
+                }
+                else {
+                    Main.USERS.write(new String[]{login.getFirst(), login.get(1)});
+                }
+                write("AUTHENTICATED");
                 LOGGER.info("YEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE");
                 //todo
+
+
 
                 close();
             }
@@ -121,7 +137,7 @@ public class ClientIO {
                         write(keyToReturn.getMeta()[0] + "\n" + keyToReturn.getMeta()[1] + "\n");
                     } else {
                         LOGGER.warning("Key is already registered");
-                        write("KEY IS REJECTED: User already registered");
+                        write("KEY IS REJECTED");
                     }
                 }
                 else {
@@ -129,8 +145,16 @@ public class ClientIO {
                     write("WRONG KEY FORMAT");
                 }
             }
-            case "UPDATE KEY" -> {
-
+            case "RESET KEY" -> {
+                List<String> login = List.of(RSA.decodeString(readFirst(), RSAServerKeys.getPrivateKey()).split("\n"));
+                List<String> dbResponse;
+                if (!(dbResponse = Main.USERS.readLine(0, login.getFirst())).isEmpty() && !dbResponse.get(1).equals(login.get(1))){
+                    write("AUTHENTICATION ERROR");
+                    close();
+                    return;
+                }
+                Main.RSA_KEYS.remove(5, login.getFirst());
+                write("OK");
             }
         }
     }
@@ -155,7 +179,8 @@ public class ClientIO {
             for (String line : lines)
                 stringBuilder.append(line).append("\n");
             LOGGER.finer("Get message: " + stringBuilder);
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             LOGGER.warning("Can't read lines");
             e.printStackTrace();
         }

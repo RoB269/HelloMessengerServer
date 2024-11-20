@@ -38,7 +38,7 @@ public class DataBaseIO {
         List<String> columns = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(url, userName, password)){
             DatabaseMetaData md = connection.getMetaData();
-            ResultSet set = md.getColumns(null, null, table.toString(), null);
+            ResultSet set = md.getColumns("hello_messenger_db", null, table.toString(), null);
             while (set.next())
                 columns.add(set.getString(get));
         } catch (SQLException e) {
@@ -137,6 +137,24 @@ public class DataBaseIO {
             String sql = ("INSERT INTO %s (%s) values(%s);")
                     .formatted(table.toString(), fields, formatValues(values));
             statement.executeUpdate(sql);
+        } catch (SQLException e) {
+            LOGGER.warning("SQL Exception");
+            e.printStackTrace();
+        }
+    }
+
+    public void remove(int columnIndex, String id){
+        remove(columnIndex, id, false);
+    }
+
+    public void remove(int columnIndex, int id){
+        remove(columnIndex, String.valueOf(id), true);
+    }
+
+    private synchronized void remove(int columnIndex, String id, boolean isNumber) {
+        try (Connection conn = DriverManager.getConnection(url, userName, password);
+             Statement statement = conn.createStatement()){
+            statement.executeUpdate((isNumber ? "DELETE FROM %s WHERE %s=%s" : "DELETE FROM %s WHERE %s='%s'").formatted(table.toString(), columns.get(columnIndex), id));
         } catch (SQLException e) {
             LOGGER.warning("SQL Exception");
             e.printStackTrace();
