@@ -67,9 +67,9 @@ public class RSAKeys {
         return Main.RSA_KEYS.isExist(5, key.getUser().getId());
     }
 
-    public static boolean registerNewKey(UserKey key) {
+    public static boolean registerNewKey(UserKey key, boolean safeReg) {
         boolean toReturn = false;
-        if (!RSAKeys.isIdentified(key)) {
+        if (!safeReg || !RSAKeys.isIdentified(key)) {
             key = addMeta(key);
             Main.RSA_KEYS.write(key.toString().split("\n"));
             toReturn = true;

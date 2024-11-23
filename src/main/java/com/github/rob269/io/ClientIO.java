@@ -1,15 +1,15 @@
 package com.github.rob269.io;
 
 import com.github.rob269.Main;
+import com.github.rob269.Message;
 import com.github.rob269.User;
 import com.github.rob269.rsa.*;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.math.BigInteger;
 import java.net.Socket;
-import java.net.SocketException;
 import java.util.*;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 public class ClientIO {
@@ -18,13 +18,16 @@ public class ClientIO {
     private Key clientKey;
     private boolean isClosed = false;
     private boolean initialized = false;
+    private String userId;
+    private long handshakeTimer;
 
     private static final Logger LOGGER = Logger.getLogger(ClientIO.class.getName());
 
-    public ClientIO(Socket clientSocket) {
+    public ClientIO(Socket clientSocket, long handshakeTimer) {
         try {
             dos = new DataOutputStream(clientSocket.getOutputStream());
             dis = new DataInputStream(clientSocket.getInputStream());
+            this.handshakeTimer = handshakeTimer;
             LOGGER.fine("Output and Input streams is open");
         } catch (IOException e) {
             LOGGER.warning("Can't open streams");
@@ -47,34 +50,36 @@ public class ClientIO {
                 close();
                 break;
             }
-            handleRequest(request);
+            if (!initialized){
+                handleInitialRequest(request);
+            }
+            else {
+                handleRequest(request);
+            }
         }
     }
 
     private void initClientKey(UserKey clientKey) throws WrongKeyException{
-        if (RSAKeys.isIdentified(clientKey) && clientKey.isAuthenticated()) {
+        if (clientKey.isAuthenticated()) {
             this.clientKey = clientKey;
             LOGGER.info("User key is approved");
             if (checkInitialization()) {
                 initialized = true;
                 List<String> login = read();
-                if (User.isIdentified(login.get(0))) {
-                    if (!Main.USERS.readLine(1, login.get(0)).get(2).equals(login.get(1))) {
+                List<String> dbLine = Main.USERS.readLine(1, login.get(0));
+                if (!dbLine.isEmpty()) {
+                    if (!dbLine.get(2).equals(login.get(1))) {
                         write("AUTHENTICATION ERROR");
                         close();
                         return;
                     }
                 }
                 else {
-                    Main.USERS.write(new String[]{login.getFirst(), login.get(1)});
+                    Main.USERS.write(new String[]{login.getFirst(), login.get(1), "NOW()"});
                 }
+                userId = login.get(0);
                 write("AUTHENTICATED");
-                LOGGER.info("YEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE");
-                //todo
-
-
-
-                close();
+                LOGGER.info("Handshake complete in " + (System.currentTimeMillis() - handshakeTimer) + "ms");
             }
             else {
                 LOGGER.warning("Fail initialization");
@@ -95,7 +100,23 @@ public class ClientIO {
         return false;
     }
 
-    private void handleRequest(String request) throws WrongKeyException {
+    private void handleRequest(String request) {
+        switch (request) {
+            case "KEEP ALIVE" -> write("OK");
+            case "EXIT" -> {
+                Main.USERS.update(1, userId, 3, "NOW()");
+                close();
+            }
+            case "SEND MESSAGE" -> {
+                List<String> messageStr = read();
+                Message message = new Message(messageStr.getFirst(), userId, messageStr.get(1));
+                Message.writeToDatabase(message);
+                write("MESSAGE OK");
+            }
+        }
+    }
+
+    private void handleInitialRequest(String request) throws WrongKeyException {
         switch (request) {
             case "GET RSA KEY" -> write(RSAServerKeys.getPublicKey().toString());
             case "KEY" -> {
@@ -126,7 +147,7 @@ public class ClientIO {
                             new User(RSA.decodeString(lines.get(2), RSAServerKeys.getPrivateKey())));
                     if (!RSAKeys.isIdentified(newKey)) {
                         UserKey keyToReturn;
-                        RSAKeys.registerNewKey(newKey);
+                        RSAKeys.registerNewKey(newKey, false);
                         keyToReturn = UserKey.getFromDatabase(newKey.getUser().getId());
                         if (keyToReturn == null) {
                             LOGGER.warning("Key is null");
@@ -147,8 +168,8 @@ public class ClientIO {
             }
             case "RESET KEY" -> {
                 List<String> login = List.of(RSA.decodeString(readFirst(), RSAServerKeys.getPrivateKey()).split("\n"));
-                List<String> dbResponse;
-                if (!(dbResponse = Main.USERS.readLine(0, login.getFirst())).isEmpty() && !dbResponse.get(1).equals(login.get(1))){
+                List<String> dbResponse = Main.USERS.readLine(1, login.getFirst());
+                if ((!dbResponse.isEmpty()) && (!dbResponse.get(2).equals(login.get(1)))){
                     write("AUTHENTICATION ERROR");
                     close();
                     return;
@@ -193,11 +214,11 @@ public class ClientIO {
             return;
         }
         try {
+            LOGGER.finer("Message sent:\n" + message);
             if (initialized)
                 message = RSA.encodeString(message, clientKey);
             dos.writeUTF(message);
             dos.flush();
-            LOGGER.finer("Message sent:\n" + message);
         } catch (IOException e) {
             LOGGER.warning("Can't send the message");
             e.printStackTrace();

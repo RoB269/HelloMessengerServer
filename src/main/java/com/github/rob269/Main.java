@@ -17,6 +17,7 @@ import java.util.logging.Logger;
 public class Main {
     public static final DataBaseIO RSA_KEYS = new DataBaseIO(DataBaseIO.Tables.USER_RSA_KEYS);
     public static final DataBaseIO USERS = new DataBaseIO(DataBaseIO.Tables.USERS);
+    public static final DataBaseIO MESSAGES = new DataBaseIO(DataBaseIO.Tables.USER_MESSAGES);
     static {
         File logsDir = new File("log/");
         if (!logsDir.exists()) {
@@ -45,12 +46,14 @@ public class Main {
 }
 
 class ServerThread extends Thread {
+    public long handshakeTimer;
     Socket clientSocket;
 
     private static final Logger LOGGER = Logger.getLogger(ServerThread.class.getName());
 
     public ServerThread(Socket clientSocket) {
         this.clientSocket = clientSocket;
+        handshakeTimer = System.currentTimeMillis();
     }
 
     @Override
@@ -61,7 +64,7 @@ class ServerThread extends Thread {
         } catch (SocketException e) {
             LOGGER.warning("Time out exception");
         }
-        ClientIO clientIO = new ClientIO(clientSocket);
+        ClientIO clientIO = new ClientIO(clientSocket, handshakeTimer);
         try {
             clientIO.init();
         } catch (WrongKeyException e) {
