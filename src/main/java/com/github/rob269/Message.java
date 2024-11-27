@@ -7,9 +7,9 @@ public class Message {
     private String recipient;
     private String sender;
     private String message;
-    private Calendar date;
+    private String date;
 
-    public Message(String recipient, String sender, String message, Calendar date) {
+    public Message(String recipient, String sender, String message, String date) {
         this.recipient = recipient;
         this.sender = sender;
         this.message = message;
@@ -24,6 +24,11 @@ public class Message {
 
     public static void writeToDatabase(Message message) {
         Main.MESSAGES.write(new String[]{message.sender, message.recipient, message.message, "NOW()"});
+    }
+
+    @Override
+    public String toString() {
+        return "(" + date + ")" + sender + "-->" + recipient + ":" + message;
     }
 
     public String getRecipient() {
@@ -50,11 +55,11 @@ public class Message {
         this.message = message;
     }
 
-    public Calendar getDate() {
+    public String getDate() {
         return date;
     }
 
-    public void setDate(Calendar date) {
+    public void setDate(String date) {
         this.date = date;
     }
 }

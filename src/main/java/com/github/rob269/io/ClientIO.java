@@ -3,6 +3,7 @@ package com.github.rob269.io;
 import com.github.rob269.Main;
 import com.github.rob269.Message;
 import com.github.rob269.User;
+import com.github.rob269.logging.ConsoleFormatter;
 import com.github.rob269.rsa.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -10,6 +11,7 @@ import java.io.*;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ClientIO {
@@ -18,7 +20,7 @@ public class ClientIO {
     private Key clientKey;
     private boolean isClosed = false;
     private boolean initialized = false;
-    private String userId;
+    private String userId = null;
     private long handshakeTimer;
 
     private static final Logger LOGGER = Logger.getLogger(ClientIO.class.getName());
@@ -30,9 +32,12 @@ public class ClientIO {
             this.handshakeTimer = handshakeTimer;
             LOGGER.fine("Output and Input streams is open");
         } catch (IOException e) {
-            LOGGER.warning("Can't open streams");
-            e.printStackTrace();
+            LOGGER.warning("Can't open streams\n" + ConsoleFormatter.formatStackTrace(e));
         }
+    }
+
+    public String getUserId() {
+        return userId;
     }
 
     public Key getClientKey() {
@@ -79,7 +84,7 @@ public class ClientIO {
                 }
                 userId = login.get(0);
                 write("AUTHENTICATED");
-                LOGGER.info("Handshake complete in " + (System.currentTimeMillis() - handshakeTimer) + "ms");
+                LOGGER.warning("Handshake complete in " + (System.currentTimeMillis() - handshakeTimer) + "ms");
             }
             else {
                 LOGGER.warning("Fail initialization");
@@ -102,9 +107,11 @@ public class ClientIO {
 
     private void handleRequest(String request) {
         switch (request) {
-            case "KEEP ALIVE" -> write("OK");
+            case "PING" ->  {
+                write("PING");
+            }
+            case "KEEP ALIVE" -> write("OK KEEP ALIVE");
             case "EXIT" -> {
-                Main.USERS.update(1, userId, 3, "NOW()");
                 close();
             }
             case "SEND MESSAGE" -> {
@@ -112,6 +119,42 @@ public class ClientIO {
                 Message message = new Message(messageStr.getFirst(), userId, messageStr.get(1));
                 Message.writeToDatabase(message);
                 write("MESSAGE OK");
+            }
+            case "GET MESSAGES" -> {
+                List<String[]> messages = Main.MESSAGES.sqlRead
+                        ("SELECT * FROM hello_messenger_db.user_messages WHERE (SELECT last_online FROM hello_messenger_db.users WHERE user_id='%s') <= date AND recipient='%s';"
+                                .formatted(userId, userId));
+                Map<String, List<Message>> messagesMap = new HashMap<>();
+                for (String[] message : messages) {
+                    if (messagesMap.containsKey(message[1])) {
+                        List<Message> l = messagesMap.get(message[1]);
+                        l.add(new Message(message[2], message[1], message[3], message[4]));
+                        messagesMap.put(message[1], l);
+                    } else {
+                        messagesMap.put(message[1], new ArrayList<>(List.of(new Message(message[2], message[1], message[3], message[4]))));
+                    }
+                }
+                String[] senders = messagesMap.keySet().toArray(new String[0]);
+                for (String sender : senders) {
+                    write("#USER");
+                    write("{" + sender + "}");
+                    List<Message> message = messagesMap.get(sender);
+                    for (Message value : message) {
+                        write("{" + value.getMessage() + "}" + "\n" + "{" + value.getDate() + "}");
+                    }
+                }
+                write("#END");
+            }
+            case "SEND FILE" -> {
+                List<String> lines;
+                ResourcesIO.delete("files/file.txt");
+                long start = System.currentTimeMillis();
+                while (true){
+                    lines = read();
+                    if (lines.getFirst().equals("END")) break;
+                    ResourcesIO.write("files/file.txt", lines, true);
+                }
+                LOGGER.warning("Complete in " + (System.currentTimeMillis()-start) + "ms");
             }
         }
     }
@@ -199,11 +242,11 @@ public class ClientIO {
             StringBuilder stringBuilder = new StringBuilder();
             for (String line : lines)
                 stringBuilder.append(line).append("\n");
-            LOGGER.finer("Get message: " + stringBuilder);
+            String log = (stringBuilder.toString().endsWith("\n") ? stringBuilder.substring(0, stringBuilder.length()-1) : stringBuilder.toString());
+            if (!log.equals("KEEP ALIVE")) LOGGER.finer("Get message:\n" + log);
         }
         catch (IOException e) {
-            LOGGER.warning("Can't read lines");
-            e.printStackTrace();
+            LOGGER.warning("Can't read lines\n" + ConsoleFormatter.formatStackTrace(e));
         }
         return lines;
     }
@@ -214,14 +257,14 @@ public class ClientIO {
             return;
         }
         try {
-            LOGGER.finer("Message sent:\n" + message);
+            String log = (message.endsWith("\n") ? message.substring(0, message.length()-1) : message);
+            if (!log.equals("OK KEEP ALIVE")) LOGGER.finer("Message sent:\n" + log);
             if (initialized)
                 message = RSA.encodeString(message, clientKey);
             dos.writeUTF(message);
             dos.flush();
         } catch (IOException e) {
-            LOGGER.warning("Can't send the message");
-            e.printStackTrace();
+            LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
         }
     }
 
@@ -234,14 +277,13 @@ public class ClientIO {
         for (String line : lines)
             stringBuilder.append(line).append("\n");
         String message = stringBuilder.toString();
-        LOGGER.finer("Sending message:\n" + message);
+        LOGGER.finer("Sending message:\n" + (message.endsWith("\n") ? message.substring(0, message.length()-1) : message));
         try {
             if (initialized) message = RSA.encodeString(message, clientKey);
             dos.writeUTF(message);
             dos.flush();
         } catch (IOException e) {
-            LOGGER.warning("Can't send the message");
-            e.printStackTrace();
+            LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
         }
     }
 
@@ -252,7 +294,6 @@ public class ClientIO {
             dos.close();
         } catch (IOException e) {
             LOGGER.warning("Can't close streams");
-            e.printStackTrace();
         }
     }
 }

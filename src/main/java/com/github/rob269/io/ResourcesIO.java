@@ -1,5 +1,6 @@
 package com.github.rob269.io;
 
+import com.github.rob269.logging.ConsoleFormatter;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -35,6 +36,13 @@ public class ResourcesIO {
         return lines;
     }
 
+    public synchronized static void delete(String filePath) {
+        File file = new File(RESOURCES_FOLDER+filePath);
+        if (file.exists()){
+            file.delete();
+        }
+    }
+
     public synchronized static void write(String filePath, List<String> lines, boolean append) {
         File file = new File(RESOURCES_FOLDER + filePath);
         if (file.getParentFile().exists()) {
@@ -44,8 +52,7 @@ public class ResourcesIO {
             try {
                 file.createNewFile();
             } catch (IOException e) {
-                LOGGER.warning("Can't create new file (" + filePath + ") ");
-                e.printStackTrace();
+                LOGGER.warning("Can't create new file (" + filePath + ")\n" + ConsoleFormatter.formatStackTrace(e));
             }
         }
         try {

@@ -6,6 +6,6 @@ import java.util.logging.LogRecord;
 public class FileFormatter extends Formatter {
     @Override
     public String format(LogRecord record) {
-        return record.getLevel().getName() + ": " + record.getMessage() + "\n";
+        return record.getLevel().getName() + ": " + record.getMessage().replaceAll("\n", "\n\t") + "\n";
     }
 }

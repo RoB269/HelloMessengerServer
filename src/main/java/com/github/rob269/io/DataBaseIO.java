@@ -1,5 +1,7 @@
 package com.github.rob269.io;
 
+import com.github.rob269.logging.ConsoleFormatter;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,8 +78,7 @@ public class DataBaseIO {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.warning("SQL Exception");
-            e.printStackTrace();
+            LOGGER.warning("SQL Exception\n" + ConsoleFormatter.formatStackTrace(e));
         }
         return columns;
     }
@@ -90,8 +91,7 @@ public class DataBaseIO {
                     .formatted(column, table, column, i));
             return set.next();
         } catch (SQLException e) {
-            LOGGER.warning("SQL Exception");
-            e.printStackTrace();
+            LOGGER.warning("SQL Exception\n" + ConsoleFormatter.formatStackTrace(e));
         }
         return false;
     }
@@ -106,7 +106,7 @@ public class DataBaseIO {
         StringBuilder stringBuilder = new StringBuilder();
         for (int i = 0; i < isAutoincrement.size(); i++) {
             if (isAutoincrement.get(i).equals("YES")) continue;
-            if (dataTypes.get(i).equals("12")) stringBuilder.append("'").append(values[j]).append("', ");
+            if (dataTypes.get(i).equals("12")) stringBuilder.append("'").append(values[j].replaceAll("'", "\\\\'")).append("', ");
             else stringBuilder.append(values[j]).append(", ");
             j++;
         }
@@ -135,8 +135,7 @@ public class DataBaseIO {
                 strings.add(line);
             }
         } catch (SQLException e) {
-            LOGGER.warning("SQL Exception");
-            e.printStackTrace();
+            LOGGER.warning("SQL Exception\n" + ConsoleFormatter.formatStackTrace(e));
         }
         return strings;
     }
@@ -162,8 +161,7 @@ public class DataBaseIO {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.warning("SQL Exception");
-            e.printStackTrace();
+            LOGGER.warning("SQL Exception\n" + ConsoleFormatter.formatStackTrace(e));
         }
         return strings;
     }
@@ -182,9 +180,26 @@ public class DataBaseIO {
                     .formatted(table.toString(), fields, formatValues(values));
             statement.executeUpdate(sql);
         } catch (SQLException e) {
-            LOGGER.warning("SQL Exception");
-            e.printStackTrace();
+            LOGGER.warning("SQL Exception\n" + ConsoleFormatter.formatStackTrace(e));
         }
+    }
+
+    public synchronized List<String[]> sqlRead(String sql) {
+        List<String[]> strings = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(url, userName, password);
+        Statement statement = conn.createStatement()){
+            ResultSet set = statement.executeQuery(sql);
+            while (set.next()) {
+                String[] line = new String[columns.size()];
+                for (int i = 0; i < columns.size(); i++) {
+                    line[i] = set.getString(i+1);
+                }
+                strings.add(line);
+            }
+        } catch (SQLException e) {
+            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+        }
+        return strings;
     }
 
     public synchronized void remove(int columnIndex, String id) {
@@ -193,8 +208,7 @@ public class DataBaseIO {
             statement.executeUpdate((dataTypes.get(columnIndex).equals("12") ? "DELETE FROM %s WHERE %s='%s'" : "DELETE FROM %s WHERE %s=%s")
                     .formatted(table.toString(), columns.get(columnIndex), id));
         } catch (SQLException e) {
-            LOGGER.warning("SQL Exception");
-            e.printStackTrace();
+            LOGGER.warning("SQL Exception\n" + ConsoleFormatter.formatStackTrace(e));
         }
     }
 
@@ -205,8 +219,7 @@ public class DataBaseIO {
                     dataTypes.get(columnInd).equals("12") ? "'" + val + "'" : val, columns.get(selectColumnInd),
                     dataTypes.get(selectColumnInd).equals("12") ? "'" + id + "'" : id));
         } catch (SQLException e) {
-            LOGGER.warning("SQL Exception");
-            e.printStackTrace();
+            LOGGER.warning("SQL Exception\n" + ConsoleFormatter.formatStackTrace(e));
         }
     }
 }

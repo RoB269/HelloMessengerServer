@@ -2,6 +2,7 @@ package com.github.rob269;
 
 import com.github.rob269.io.ClientIO;
 import com.github.rob269.io.DataBaseIO;
+import com.github.rob269.logging.ConsoleFormatter;
 import com.github.rob269.rsa.RSAServerKeys;
 import com.github.rob269.rsa.WrongKeyException;
 
@@ -28,15 +29,14 @@ public class Main {
 
     public static void main(String[] args) {
         init();
-        try (ServerSocket serverSocket = new ServerSocket(5099)){
+        try (ServerSocket serverSocket = new ServerSocket(5099)) {
             LOGGER.info("The server is running");
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                new ServerThread(clientSocket).start();
+                new ConnectionMainThread(clientSocket).start();
             }
         } catch (IOException e) {
-            LOGGER.warning("Server can't start");
-            e.printStackTrace();
+            LOGGER.warning("Server can't start\n" + ConsoleFormatter.formatStackTrace(e));
         }
     }
 
@@ -45,13 +45,13 @@ public class Main {
     }
 }
 
-class ServerThread extends Thread {
+class ConnectionMainThread extends Thread {
     public long handshakeTimer;
     Socket clientSocket;
 
-    private static final Logger LOGGER = Logger.getLogger(ServerThread.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ConnectionMainThread.class.getName());
 
-    public ServerThread(Socket clientSocket) {
+    public ConnectionMainThread(Socket clientSocket) {
         this.clientSocket = clientSocket;
         handshakeTimer = System.currentTimeMillis();
     }
@@ -68,16 +68,15 @@ class ServerThread extends Thread {
         try {
             clientIO.init();
         } catch (WrongKeyException e) {
-            LOGGER.warning("Wrong Key");
-            e.printStackTrace();
+            LOGGER.warning("Wrong Key\n" + ConsoleFormatter.formatStackTrace(e));
         }
         try {
+//            if (clientIO.getUserId() != null) Main.USERS.update(1, clientIO.getUserId(), 3, "NOW()"); //todo HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
             if (!clientIO.isClosed()) clientIO.close();
             LOGGER.info(clientSocket.getInetAddress() + " disconnected");
             clientSocket.close();
         } catch (IOException e) {
-            LOGGER.warning("Exception at clientSocket.close()");
-            e.printStackTrace();
+            LOGGER.warning("Exception at clientSocket.close()\n" + ConsoleFormatter.formatStackTrace(e));
         }
     }
 }
