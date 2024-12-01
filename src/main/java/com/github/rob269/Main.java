@@ -11,6 +11,10 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -19,10 +23,14 @@ public class Main {
     public static final DataBaseIO RSA_KEYS = new DataBaseIO(DataBaseIO.Tables.USER_RSA_KEYS);
     public static final DataBaseIO USERS = new DataBaseIO(DataBaseIO.Tables.USERS);
     public static final DataBaseIO MESSAGES = new DataBaseIO(DataBaseIO.Tables.USER_MESSAGES);
+    public volatile static Set<String> usersOnline = new HashSet<>();
+    public volatile static Set<String> needToCheckMessages = new HashSet<>();
     static {
         File logsDir = new File("log/");
         if (!logsDir.exists()) {
-            logsDir.mkdir();
+            if (!logsDir.mkdir()) {
+                throw new RuntimeException();
+            }
         }
     }
     private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
@@ -71,7 +79,6 @@ class ConnectionMainThread extends Thread {
             LOGGER.warning("Wrong Key\n" + ConsoleFormatter.formatStackTrace(e));
         }
         try {
-//            if (clientIO.getUserId() != null) Main.USERS.update(1, clientIO.getUserId(), 3, "NOW()"); //todo HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
             if (!clientIO.isClosed()) clientIO.close();
             LOGGER.info(clientSocket.getInetAddress() + " disconnected");
             clientSocket.close();

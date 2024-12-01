@@ -5,11 +5,12 @@ import com.github.rob269.Message;
 import com.github.rob269.User;
 import com.github.rob269.logging.ConsoleFormatter;
 import com.github.rob269.rsa.*;
-import org.jetbrains.annotations.NotNull;
+import com.google.common.hash.Hashing;
 
 import java.io.*;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,10 +41,6 @@ public class ClientIO {
         return userId;
     }
 
-    public Key getClientKey() {
-        return clientKey;
-    }
-
     public boolean isClosed() {
         return isClosed;
     }
@@ -71,18 +68,21 @@ public class ClientIO {
             if (checkInitialization()) {
                 initialized = true;
                 List<String> login = read();
+                String hash = Hashing.sha256().hashString(login.get(1)+login.getFirst(), StandardCharsets.UTF_8).toString();
                 List<String> dbLine = Main.USERS.readLine(1, login.get(0));
                 if (!dbLine.isEmpty()) {
-                    if (!dbLine.get(2).equals(login.get(1))) {
+                    if (!dbLine.get(2).equals(hash)) {
                         write("AUTHENTICATION ERROR");
                         close();
                         return;
                     }
                 }
                 else {
-                    Main.USERS.write(new String[]{login.getFirst(), login.get(1), "NOW()"});
+                    Main.USERS.write(new String[]{login.getFirst(), hash, "NOW()"});
                 }
-                userId = login.get(0);
+                userId = login.getFirst();
+                Thread.currentThread().setName("{" + userId+"}MainThread");
+                Main.usersOnline.add(userId);
                 write("AUTHENTICATED");
                 LOGGER.warning("Handshake complete in " + (System.currentTimeMillis() - handshakeTimer) + "ms");
             }
@@ -107,43 +107,52 @@ public class ClientIO {
 
     private void handleRequest(String request) {
         switch (request) {
-            case "PING" ->  {
-                write("PING");
-            }
-            case "KEEP ALIVE" -> write("OK KEEP ALIVE");
-            case "EXIT" -> {
-                close();
-            }
+            case "PING" -> write("PING", Level.FINEST);
+            case "KEEP ALIVE" -> write("OK KEEP ALIVE", Level.ALL);
+            case "EXIT" -> close();
             case "SEND MESSAGE" -> {
                 List<String> messageStr = read();
                 Message message = new Message(messageStr.getFirst(), userId, messageStr.get(1));
                 Message.writeToDatabase(message);
+                if (Main.usersOnline.contains(messageStr.getFirst()))
+                    Main.needToCheckMessages.add(messageStr.getFirst());
                 write("MESSAGE OK");
             }
-            case "GET MESSAGES" -> {
+            case "CHECK" -> {
+                if (Main.needToCheckMessages.contains(userId)) {
+                    write("CHECK YES", Level.ALL);
+                }
+                else {
+                    write("CHECK NO", Level.ALL);
+                }
+            }
+            case "GET NEW MESSAGES" -> {
                 List<String[]> messages = Main.MESSAGES.sqlRead
                         ("SELECT * FROM hello_messenger_db.user_messages WHERE (SELECT last_online FROM hello_messenger_db.users WHERE user_id='%s') <= date AND recipient='%s';"
                                 .formatted(userId, userId));
-                Map<String, List<Message>> messagesMap = new HashMap<>();
-                for (String[] message : messages) {
-                    if (messagesMap.containsKey(message[1])) {
-                        List<Message> l = messagesMap.get(message[1]);
-                        l.add(new Message(message[2], message[1], message[3], message[4]));
-                        messagesMap.put(message[1], l);
-                    } else {
-                        messagesMap.put(message[1], new ArrayList<>(List.of(new Message(message[2], message[1], message[3], message[4]))));
-                    }
-                }
-                String[] senders = messagesMap.keySet().toArray(new String[0]);
-                for (String sender : senders) {
-                    write("#USER");
-                    write("{" + sender + "}");
-                    List<Message> message = messagesMap.get(sender);
-                    for (Message value : message) {
-                        write("{" + value.getMessage() + "}" + "\n" + "{" + value.getDate() + "}");
-                    }
-                }
-                write("#END");
+                Main.needToCheckMessages.remove(userId);
+                sendMessages(messages);
+            }
+            case "GET MESSAGES" -> {
+                List<String[]> messages = Main.MESSAGES.sqlRead(
+                        "SELECT * FROM hello_messenger_db.user_messages WHERE recipient='%s';".formatted(userId));
+                sendMessages(messages);
+            }
+            case "GET MESSAGES COUNT" -> {
+                List<String[]> messages = Main.MESSAGES.sqlRead(
+                        "SELECT * FROM hello_messenger_db.user_messages WHERE recipient='%s';".formatted(userId));
+                write(String.valueOf(messages.size()));
+            }
+            case "GET SENT MESSAGES" -> {
+                List<String[]> messages = Main.MESSAGES.sqlRead(
+                        "SELECT * FROM hello_messenger_db.user_messages WHERE sender='%s'".formatted(userId)
+                );
+                sendSentMessages(messages);
+            }
+            case "GET SENT MESSAGES COUNT" -> {
+                List<String[]> messages = Main.MESSAGES.sqlRead(
+                        "SELECT * FROM hello_messenger_db.user_messages WHERE sender='%s';".formatted(userId));
+                write(String.valueOf(messages.size()));
             }
             case "SEND FILE" -> {
                 List<String> lines;
@@ -151,12 +160,58 @@ public class ClientIO {
                 long start = System.currentTimeMillis();
                 while (true){
                     lines = read();
-                    if (lines.getFirst().equals("END")) break;
+                    if (lines.getFirst().equals("#END")) break;
                     ResourcesIO.write("files/file.txt", lines, true);
                 }
                 LOGGER.warning("Complete in " + (System.currentTimeMillis()-start) + "ms");
             }
         }
+    }
+
+    private void sendMessages(List<String[]> messages) {
+        Map<String, List<Message>> messagesMap = new HashMap<>();
+        for (String[] message : messages) {
+            if (messagesMap.containsKey(message[1])) {
+                List<Message> l = messagesMap.get(message[1]);
+                l.add(new Message(message[2], message[1], message[3], message[4]));
+                messagesMap.put(message[1], l);
+            } else {
+                messagesMap.put(message[1], new ArrayList<>(List.of(new Message(message[2], message[1], message[3], message[4]))));
+            }
+        }
+        String[] senders = messagesMap.keySet().toArray(new String[0]);
+        for (String sender : senders) {
+            write("#USER", Level.ALL);
+            write("{" + sender + "}", Level.ALL);
+            List<Message> message = messagesMap.get(sender);
+            for (Message value : message) {
+                write("{" + value.getMessage() + "}" + "\n" + "{" + value.getDate() + "}", Level.ALL);
+            }
+        }
+        write("#END", Level.ALL);
+        Main.USERS.update(1, userId, 3, "NOW()");
+    }
+    private void sendSentMessages(List<String[]> messages) {
+        Map<String, List<Message>> messagesMap = new HashMap<>();
+        for (String[] message : messages) {
+            if (messagesMap.containsKey(message[2])) {
+                List<Message> l = messagesMap.get(message[2]);
+                l.add(new Message(message[2], message[1], message[3], message[4]));
+                messagesMap.put(message[2], l);
+            } else {
+                messagesMap.put(message[2], new ArrayList<>(List.of(new Message(message[2], message[1], message[3], message[4]))));
+            }
+        }
+        String[] recipients = messagesMap.keySet().toArray(new String[0]);
+        for (String recipient : recipients) {
+            write("#USER", Level.ALL);
+            write("{" + recipient + "}", Level.ALL);
+            List<Message> message = messagesMap.get(recipient);
+            for (Message value : message) {
+                write("{" + value.getMessage() + "}" + "\n" + "{" + value.getDate() + "}", Level.ALL);
+            }
+        }
+        write("#END", Level.ALL);
     }
 
     private void handleInitialRequest(String request) throws WrongKeyException {
@@ -212,7 +267,8 @@ public class ClientIO {
             case "RESET KEY" -> {
                 List<String> login = List.of(RSA.decodeString(readFirst(), RSAServerKeys.getPrivateKey()).split("\n"));
                 List<String> dbResponse = Main.USERS.readLine(1, login.getFirst());
-                if ((!dbResponse.isEmpty()) && (!dbResponse.get(2).equals(login.get(1)))){
+                String hash = Hashing.sha256().hashString(login.get(1)+login.getFirst(), StandardCharsets.UTF_8).toString();
+                if ((!dbResponse.isEmpty()) && (!dbResponse.get(2).equals(hash))){
                     write("AUTHENTICATION ERROR");
                     close();
                     return;
@@ -232,39 +288,50 @@ public class ClientIO {
     }
 
     public List<String> read() {
+        return read(Level.FINER);
+    }
+
+    public List<String> read(Level loggingLevel) {
         List<String> lines = new ArrayList<>();
-        try {
-            String inputString = dis.readUTF();
-            if (initialized) {
-                inputString = RSA.decodeString(inputString, RSAServerKeys.getPrivateKey());
+        if (!isClosed){
+            try {
+                String inputString = dis.readUTF();
+                if (initialized) {
+                    inputString = RSA.decodeString(inputString, RSAServerKeys.getPrivateKey());
+                }
+                lines = new ArrayList<>(List.of(inputString.split("\n")));
+                StringBuilder stringBuilder = new StringBuilder();
+                for (String line : lines)
+                    stringBuilder.append(line).append("\n");
+                String log = (stringBuilder.toString().endsWith("\n") ? stringBuilder.substring(0, stringBuilder.length() - 1) : stringBuilder.toString());
+                if (!log.equals("KEEP ALIVE") && !log.equals("CHECK")) LOGGER.log(loggingLevel, "Get message:\n" + log);
+            } catch (IOException e) {
+                LOGGER.warning("Can't read lines\n" + ConsoleFormatter.formatStackTrace(e));
             }
-            lines = new ArrayList<>(List.of(inputString.split("\n")));
-            StringBuilder stringBuilder = new StringBuilder();
-            for (String line : lines)
-                stringBuilder.append(line).append("\n");
-            String log = (stringBuilder.toString().endsWith("\n") ? stringBuilder.substring(0, stringBuilder.length()-1) : stringBuilder.toString());
-            if (!log.equals("KEEP ALIVE")) LOGGER.finer("Get message:\n" + log);
-        }
-        catch (IOException e) {
-            LOGGER.warning("Can't read lines\n" + ConsoleFormatter.formatStackTrace(e));
         }
         return lines;
     }
 
     public void write(String message) {
+        write(message, Level.FINER);
+    }
+
+    public void write(String message, Level loggingLevel) {
         if (message == null) {
             LOGGER.warning("Null message");
             return;
         }
-        try {
-            String log = (message.endsWith("\n") ? message.substring(0, message.length()-1) : message);
-            if (!log.equals("OK KEEP ALIVE")) LOGGER.finer("Message sent:\n" + log);
-            if (initialized)
-                message = RSA.encodeString(message, clientKey);
-            dos.writeUTF(message);
-            dos.flush();
-        } catch (IOException e) {
-            LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
+        if (!isClosed){
+            try {
+                String log = (message.endsWith("\n") ? message.substring(0, message.length() - 1) : message);
+                LOGGER.log(loggingLevel, "Message sent:\n" + log);
+                if (initialized)
+                    message = RSA.encodeString(message, clientKey);
+                dos.writeUTF(message);
+                dos.flush();
+            } catch (IOException e) {
+                LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
+            }
         }
     }
 
@@ -273,21 +340,24 @@ public class ClientIO {
             LOGGER.warning("Null message");
             return;
         }
-        StringBuilder stringBuilder = new StringBuilder();
-        for (String line : lines)
-            stringBuilder.append(line).append("\n");
-        String message = stringBuilder.toString();
-        LOGGER.finer("Sending message:\n" + (message.endsWith("\n") ? message.substring(0, message.length()-1) : message));
-        try {
-            if (initialized) message = RSA.encodeString(message, clientKey);
-            dos.writeUTF(message);
-            dos.flush();
-        } catch (IOException e) {
-            LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
+        if (!isClosed){
+            StringBuilder stringBuilder = new StringBuilder();
+            for (String line : lines)
+                stringBuilder.append(line).append("\n");
+            String message = stringBuilder.toString();
+            LOGGER.finer("Sending message:\n" + (message.endsWith("\n") ? message.substring(0, message.length() - 1) : message));
+            try {
+                if (initialized) message = RSA.encodeString(message, clientKey);
+                dos.writeUTF(message);
+                dos.flush();
+            } catch (IOException e) {
+                LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
+            }
         }
     }
 
     public void close() {
+        if (userId != null) Main.usersOnline.remove(userId);
         isClosed = true;
         try {
             dis.close();
