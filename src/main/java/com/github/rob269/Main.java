@@ -11,10 +11,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -25,6 +22,7 @@ public class Main {
     public static final DataBaseIO MESSAGES = new DataBaseIO(DataBaseIO.Tables.USER_MESSAGES);
     public volatile static Set<String> usersOnline = new HashSet<>();
     public volatile static Set<String> needToCheckMessages = new HashSet<>();
+    private static boolean isOnline = true;
     static {
         File logsDir = new File("log/");
         if (!logsDir.exists()) {
@@ -39,13 +37,17 @@ public class Main {
         init();
         try (ServerSocket serverSocket = new ServerSocket(5099)) {
             LOGGER.info("The server is running");
-            while (true) {
+            while (isOnline) {
                 Socket clientSocket = serverSocket.accept();
                 new ConnectionMainThread(clientSocket).start();
             }
         } catch (IOException e) {
             LOGGER.warning("Server can't start\n" + ConsoleFormatter.formatStackTrace(e));
         }
+    }
+
+    protected static void disableServer() {
+        isOnline = false;
     }
 
     private static void init() {
