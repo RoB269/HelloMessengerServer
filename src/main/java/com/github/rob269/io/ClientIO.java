@@ -92,6 +92,7 @@ public class ClientIO {
             }
         }
         else {
+            write("Wrong key");
             throw new WrongKeyException("Wrong key");
         }
     }
