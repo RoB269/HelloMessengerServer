@@ -137,6 +137,7 @@ public class ClientIO {
             case "GET MESSAGES" -> {
                 List<String[]> messages = Main.MESSAGES.sqlRead(
                         "SELECT * FROM hello_messenger_db.user_messages WHERE recipient='%s';".formatted(userId));
+                Main.needToCheckMessages.remove(userId);
                 sendMessages(messages);
             }
             case "GET MESSAGES COUNT" -> {
