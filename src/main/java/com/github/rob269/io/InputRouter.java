@@ -1,6 +1,5 @@
 package com.github.rob269.io;
 
-import com.github.rob269.logging.ConsoleFormatter;
 import com.github.rob269.rsa.RSA;
 import com.github.rob269.rsa.RSAServerKeys;
 
@@ -12,7 +11,6 @@ import java.util.logging.Logger;
 public class InputRouter extends Thread {
     private static final Logger LOGGER = Logger.getLogger(InputRouter.class.getName());
     private DataInputStream dis;
-    private boolean isClosed = false;
     private final ClientIO clientIO;
     public final Deque<byte[]> mainThreadInput = new ArrayDeque<>();
     public final Deque<byte[]> sideThreadInput = new ArrayDeque<>();
@@ -23,7 +21,6 @@ public class InputRouter extends Thread {
     }
 
     public void close() {
-        isClosed = true;
         interrupt();
     }
 
@@ -31,15 +28,14 @@ public class InputRouter extends Thread {
     @Override
     public void run() {
         try {
-            while (!isClosed) {
-                byte[] input = new byte[129];
+            while (!isInterrupted()) {
+                byte[] input = new byte[130];
                 int inputSize = dis.read(input);
                 int command;
                 if (inputSize == -1) {
                     mainThreadInput.add(new byte[]{0});
-                    LOGGER.warning("Client has disconnected");
                     break;
-                } else if (inputSize == 129) {
+                } else if (inputSize == 130) {
                     command = RSA.decodeByteArray(input, RSAServerKeys.getPrivateKey())[0];
                 } else {
                     command = input[0];
@@ -66,6 +62,6 @@ public class InputRouter extends Thread {
             clientIO.close();
             mainThreadInput.notify();
         }
-        LOGGER.info("Input router closed");
+        LOGGER.fine("Input router closed");
     }
 }

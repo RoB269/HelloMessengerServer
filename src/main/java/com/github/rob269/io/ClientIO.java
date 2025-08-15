@@ -1,8 +1,6 @@
 package com.github.rob269.io;
 
 import com.github.rob269.Main;
-import com.github.rob269.Message;
-import com.github.rob269.User;
 import com.github.rob269.logging.ConsoleFormatter;
 import com.github.rob269.rsa.*;
 
@@ -53,7 +51,7 @@ public class ClientIO {
         return isClosed;
     }
 
-    public void init() throws WrongKeyException {
+    public void init() throws IOException {
         while (!isClosed) {
             byte request = readCommand();
             if (!isClosed) {
@@ -66,32 +64,25 @@ public class ClientIO {
         }
     }
 
-    private void initClientKey(UserKey clientKey) throws WrongKeyException{
-        if (clientKey.isAuthenticated()) {
-            this.clientKey = clientKey;
-            LOGGER.info("User key is approved");
-            if (checkInitialization()) {
-                initialized = true;
-                LOGGER.warning("Handshake complete in " + (System.currentTimeMillis() - handshakeTimer) + "ms");
-                try {
-                    clientSocket.setSoTimeout(0);
-                    clientSocket.setKeepAlive(true);
-                } catch (SocketException e) {
-                    LOGGER.warning("Socket exception\n" + ConsoleFormatter.formatStackTrace(e));
-                }
+    private void initClientKey(Key clientKey) throws IOException {
+        this.clientKey = clientKey;
+        LOGGER.fine("User's key is received");
+        if (checkInitialization()) {
+            initialized = true;
+            LOGGER.warning("Handshake complete in " + (System.currentTimeMillis() - handshakeTimer) + "ms");
+            try {
+                clientSocket.setSoTimeout(0);
+                clientSocket.setKeepAlive(true);
+            } catch (SocketException e) {
+                LOGGER.warning("Socket exception\n" + ConsoleFormatter.formatStackTrace(e));
             }
-            else {
-                LOGGER.warning("Fail initialization");
-                close();
-            }
-        }
-        else {
-            writeCommand(63);
-            throw new WrongKeyException("Wrong key");
+        } else {
+            LOGGER.warning("Fail initialization");
+            close();
         }
     }
 
-    private boolean checkInitialization() {
+    private boolean checkInitialization() throws IOException {
         byte[] bytes = RSA.encodeByteArray(new byte[]{30}, clientKey);
         write(bytes, false);
         if (readCommand() == 30) {
@@ -101,13 +92,13 @@ public class ClientIO {
         return false;
     }
 
-    private void handleRequest(byte request) {
+    private void handleRequest(byte request) throws IOException {
         switch (request) {
             case 90 -> writeCommand(90);//Ping
             case 99 -> close();//Exit
             case 23 -> {//Login
                 String userId = readString();
-                String password = readString();
+                String password = readString(false);
                 String hash = sha256(password+userId);
                 List<String> dbLine = Main.USERS.readLine(1, userId);
                 if (!dbLine.isEmpty()) {
@@ -132,54 +123,54 @@ public class ClientIO {
         }
     }
 
-    @Deprecated
-    private void sendMessages(List<String[]> messages) {
-        Map<String, List<Message>> messagesMap = new HashMap<>();
-        for (String[] message : messages) {
-            if (messagesMap.containsKey(message[1])) {
-                List<Message> l = messagesMap.get(message[1]);
-                l.add(new Message(message[2], message[1], message[3], message[4]));
-                messagesMap.put(message[1], l);
-            } else {
-                messagesMap.put(message[1], new ArrayList<>(List.of(new Message(message[2], message[1], message[3], message[4]))));
-            }
-        }
-        String[] senders = messagesMap.keySet().toArray(new String[0]);
-        for (String sender : senders) {
-            write("#USER", Level.ALL);
-            write("{" + sender + "}", Level.ALL);
-            List<Message> message = messagesMap.get(sender);
-            for (Message value : message) {
-                write("{" + value.getMessage() + "}" + "\n" + "{" + value.getDate() + "}", Level.ALL);
-            }
-        }
-        write("#END", Level.ALL);
-        Main.USERS.update(1, userId, 3, "NOW()");
-    }
-
-    @Deprecated
-    private void sendSentMessages(List<String[]> messages) {
-        Map<String, List<Message>> messagesMap = new HashMap<>();
-        for (String[] message : messages) {
-            if (messagesMap.containsKey(message[2])) {
-                List<Message> l = messagesMap.get(message[2]);
-                l.add(new Message(message[2], message[1], message[3], message[4]));
-                messagesMap.put(message[2], l);
-            } else {
-                messagesMap.put(message[2], new ArrayList<>(List.of(new Message(message[2], message[1], message[3], message[4]))));
-            }
-        }
-        String[] recipients = messagesMap.keySet().toArray(new String[0]);
-        for (String recipient : recipients) {
-            write("#USER", Level.ALL);
-            write("{" + recipient + "}", Level.ALL);
-            List<Message> message = messagesMap.get(recipient);
-            for (Message value : message) {
-                write("{" + value.getMessage() + "}" + "\n" + "{" + value.getDate() + "}", Level.ALL);
-            }
-        }
-        write("#END", Level.ALL);
-    }
+//    @Deprecated
+//    private void sendMessages(List<String[]> messages) {
+//        Map<String, List<Message>> messagesMap = new HashMap<>();
+//        for (String[] message : messages) {
+//            if (messagesMap.containsKey(message[1])) {
+//                List<Message> l = messagesMap.get(message[1]);
+//                l.add(new Message(message[2], message[1], message[3], message[4]));
+//                messagesMap.put(message[1], l);
+//            } else {
+//                messagesMap.put(message[1], new ArrayList<>(List.of(new Message(message[2], message[1], message[3], message[4]))));
+//            }
+//        }
+//        String[] senders = messagesMap.keySet().toArray(new String[0]);
+//        for (String sender : senders) {
+//            write("#USER", Level.ALL);
+//            write("{" + sender + "}", Level.ALL);
+//            List<Message> message = messagesMap.get(sender);
+//            for (Message value : message) {
+//                write("{" + value.getMessage() + "}" + "\n" + "{" + value.getDate() + "}", Level.ALL);
+//            }
+//        }
+//        write("#END", Level.ALL);
+//        Main.USERS.update(1, userId, 3, "NOW()");
+//    }
+//
+//    @Deprecated
+//    private void sendSentMessages(List<String[]> messages) {
+//        Map<String, List<Message>> messagesMap = new HashMap<>();
+//        for (String[] message : messages) {
+//            if (messagesMap.containsKey(message[2])) {
+//                List<Message> l = messagesMap.get(message[2]);
+//                l.add(new Message(message[2], message[1], message[3], message[4]));
+//                messagesMap.put(message[2], l);
+//            } else {
+//                messagesMap.put(message[2], new ArrayList<>(List.of(new Message(message[2], message[1], message[3], message[4]))));
+//            }
+//        }
+//        String[] recipients = messagesMap.keySet().toArray(new String[0]);
+//        for (String recipient : recipients) {
+//            write("#USER", Level.ALL);
+//            write("{" + recipient + "}", Level.ALL);
+//            List<Message> message = messagesMap.get(recipient);
+//            for (Message value : message) {
+//                write("{" + value.getMessage() + "}" + "\n" + "{" + value.getDate() + "}", Level.ALL);
+//            }
+//        }
+//        write("#END", Level.ALL);
+//    }
 
     private static String sha256(String string) {
         try {
@@ -198,7 +189,7 @@ public class ClientIO {
         return null;
     }
 
-    private void handleInitialRequest(byte request) throws WrongKeyException {
+    private void handleInitialRequest(byte request) throws IOException {
         switch (request) {
             case 10 -> {//Get rsa keys
                 writeCommand(52);
@@ -212,64 +203,29 @@ public class ClientIO {
             }
             case 20 -> {//Key
                 BigInteger[] key = new BigInteger[2];
-                BigInteger[] meta = new BigInteger[2];
                 for (int i = 0; i < 2; i++) key[i] = readBigint();
-                for (int i = 0; i < 2; i++) meta[i] = readBigint();
-                User user = new User(new String(RSA.decodeByteArray(read(), RSAServerKeys.getPrivateKey())));
-                UserKey clientKey = new UserKey(key, user);
-                clientKey.setMeta(meta);
+                Key clientKey = new Key(key);
                 initClientKey(clientKey);
-            }
-            case 21 -> {//Register new key
-                BigInteger[] key = new BigInteger[2];
-                for (int i = 0; i < 2; i++) key[i] = readBigint();
-                String user = RSA.decodeByteToString(read(), RSAServerKeys.getPrivateKey());
-                UserKey newKey = new UserKey(key, new User(user));
-                if (!RSAKeysPair.isIdentified(newKey)) {
-                    UserKey keyToReturn;
-                    RSAKeysPair.registerNewKey(newKey, false);
-                    keyToReturn = UserKey.getFromDatabase(newKey.getUser().getId());
-                    if (keyToReturn == null) {
-                        LOGGER.warning("Key is null");
-                        writeCommand(60);
-                        return;
-                    }
-                    writeCommand(51);
-                    writePackageCount(2);
-                    for (int i = 0; i < 2; i++) write(keyToReturn.getMeta()[i]);
-                } else {
-                    LOGGER.warning("Key is already registered");
-                    writeCommand(61);
-                }
-            }
-            case 22 -> {//Reset
-                String user = RSA.decodeByteToString(read(), RSAServerKeys.getPrivateKey());
-                String password = RSA.decodeByteToString(read(), RSAServerKeys.getPrivateKey());
-                List<String> dbResponse = Main.USERS.readLine(1, user);
-                String hash = sha256(password+user);
-                if ((!dbResponse.isEmpty()) && (!dbResponse.get(2).equals(hash))){
-                    writeCommand(62);
-                    close();
-                    return;
-                }
-                Main.RSA_KEYS.remove(4, user);
-                writeCommand(50);
             }
             case 0 -> close();
         }
     }
 
-    public String readString() {
+    public String readString() throws IOException {
+        return readString(true);
+    }
+
+    public String readString(boolean log) throws IOException {
         byte[] bytes = read();
         if (bytes != null){
             String string = new String(bytes);
-            LOGGER.finer("Get message:\n" + string);
+            if (log) LOGGER.finer("Get message:\n" + string);
             return string;
         }
         return null;
     }
 
-    public byte readCommand() {
+    public byte readCommand() throws IOException {
         byte[] bytes = read();
         if (bytes != null) {
             byte command = bytes[0];
@@ -279,7 +235,7 @@ public class ClientIO {
         return 0;
     }
 
-    public BigInteger readBigint() {
+    public BigInteger readBigint() throws IOException {
         byte[] bytes = read();
         if (bytes != null) {
             BigInteger bigint = new BigInteger(bytes);
@@ -289,8 +245,9 @@ public class ClientIO {
         return null;
     }
 
-    public byte[] read() {
+    public byte[] read() throws IOException{
         byte[] result = null;
+        LOGGER.finest("Reading bytes");
         if (Thread.currentThread().getName().startsWith("Main")) {
             synchronized (router.mainThreadInput) {
                 while (router.mainThreadInput.isEmpty() && !isClosed) {
@@ -315,26 +272,27 @@ public class ClientIO {
                 result = router.sideThreadInput.poll();
             }
         }
+        if (isClosed) throw new IOException();
         return result;
     }
 
-    public void write(String message) {
+    public void write(String message) throws IOException {
         write(message, Level.FINER);
     }
 
-    public void write(String message, Level loggingLevel) {
+    public void write(String message, Level loggingLevel) throws IOException {
         if (!isClosed){
             write(message.getBytes());
             LOGGER.log(loggingLevel, "Message sent:\n" + message);
         }
     }
 
-    public void write(BigInteger message) {
+    public void write(BigInteger message) throws IOException {
         LOGGER.finer("Write bigint:\n" + message);
         write(message.toByteArray());
     }
 
-    public void writeCommand(int message) {
+    public void writeCommand(int message) throws IOException {
         LOGGER.finer("Write command: " + message);
         write(new byte[]{(byte) message}, false);
     }
@@ -350,11 +308,11 @@ public class ClientIO {
         }
     }
 
-    public void write(byte[] message) {
+    public void write(byte[] message) throws IOException {
         write(message, true);
     }
 
-    public void write(byte[] message, boolean sendPackageSize) {
+    public void write(byte[] message, boolean sendPackageSize) throws IOException{
         if (!isClosed) {
             LOGGER.finest("Sending byte message");
             try {
@@ -365,7 +323,9 @@ public class ClientIO {
             } catch (IOException e) {
                 LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
             }
+            return;
         }
+        throw new IOException();
     }
 
     public void close() {
@@ -375,7 +335,7 @@ public class ClientIO {
             dis.close();
             dos.close();
             router.close();
-            LOGGER.info("ClientIO closed");
+            LOGGER.fine("ClientIO closed");
         } catch (IOException e) {
             LOGGER.warning("Can't close streams");
         }

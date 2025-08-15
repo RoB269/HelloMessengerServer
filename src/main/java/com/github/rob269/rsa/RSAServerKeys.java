@@ -15,23 +15,23 @@ public class RSAServerKeys {
         if (ResourcesIO.isExist("RSA/serverKeys.json")) {
             try {
                 RSAKeysPair serverKeys = ResourcesIO.readJSON("RSA/serverKeys.json", RSAKeysPair.class);
-                if (serverKeys == null || serverKeys.getUser() == null) {
+                if (serverKeys == null || serverKeys.getAdminId() == null) {
                     throw new NullPointerException();
                 }
                 RSAServerKeys.serverKeys = serverKeys;
                 LOGGER.fine("The keys have been read");
             } catch (NullPointerException e) {
                 LOGGER.warning("Keys not found");
-                writeNewKeys();
+                generateNewKeys();
             }
         }
         else {
-            writeNewKeys();
+            generateNewKeys();
         }
         LOGGER.fine("The keys have been initialized");
     }
 
-    private static void writeNewKeys() {
+    private static void generateNewKeys() {
         BigInteger[][] keys = RSA.generateKeys();
         RSAServerKeys.serverKeys = new RSAKeysPair(keys, SERVER);
         ResourcesIO.writeJSON("RSA/serverKeys.json", serverKeys);

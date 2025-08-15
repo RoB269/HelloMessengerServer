@@ -1,10 +1,8 @@
 package com.github.rob269.rsa;
 
-import com.github.rob269.Main;
 import com.github.rob269.User;
 
 import java.math.BigInteger;
-import java.util.List;
 
 public class UserKey extends Key{
     private final BigInteger[] meta = new BigInteger[2];
@@ -20,27 +18,6 @@ public class UserKey extends Key{
         this.meta[0] = meta[0];
         this.meta[1] = meta[1];
         this.user = user;
-    }
-
-    public static UserKey getFromDatabase(String userId) {
-        List<String> strings = Main.RSA_KEYS.readLine(4, userId);
-        if (strings.size() == 5){
-            return new UserKey(new BigInteger[]{
-                    new BigInteger(strings.get(0)),
-                    new BigInteger(strings.get(1))
-            }, new BigInteger[]{
-                    new BigInteger(strings.get(2)),
-                    new BigInteger(strings.get(3))
-            }, new User(strings.get(4)));
-        }
-        else {
-            return null;
-        }
-    }
-
-    public boolean isAuthenticated() {
-        Key val = getFromDatabase(user.getId());
-        return this.equals(val);
     }
 
     public User getUser() {

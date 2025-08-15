@@ -18,15 +18,6 @@ public class DataBaseTable {
     private final Tables table;
 
     public enum Tables {
-        USER_RSA_KEYS("user_rsa_keys"),
-        /*
-        id
-        user_key_0
-        user_key_1
-        user_key_meta_0
-        user_key_meta_1
-        user_id
-         */
         USERS("users"),
         /*
         id
