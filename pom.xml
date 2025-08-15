@@ -33,16 +33,23 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.7.1</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>com.github.rob269.Main</mainClass>
-                        </manifest>
-                    </archive>
-                    <descriptorRefs>jar-with-dependencies</descriptorRefs>
-                </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <archive>
+                                <manifest>
+                                    <mainClass>com.github.rob269.Main</mainClass>
+                                </manifest>
+                            </archive>
+                            <descriptorRefs>jar-with-dependencies</descriptorRefs>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
-
 </project>
