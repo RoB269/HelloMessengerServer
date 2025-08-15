@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
-public class DataBaseIO {
-    public static final Logger LOGGER = Logger.getLogger(DataBaseIO.class.getName());
+public class DataBaseTable {
+    public static final Logger LOGGER = Logger.getLogger(DataBaseTable.class.getName());
     private static final String userName = "root";
     private static final String password = "root";
     private static final String url = "jdbc:mysql://127.0.0.1:3306/hello_messenger_db";
@@ -54,7 +54,7 @@ public class DataBaseIO {
         }
     }
 
-    public DataBaseIO(Tables table) {
+    public DataBaseTable(Tables table) {
         this.table = table;
         List<List<String>> col = getMetaData("COLUMN_NAME", "DATA_TYPE", "IS_AUTOINCREMENT");
         columns = col.get(0);
@@ -200,6 +200,15 @@ public class DataBaseIO {
             LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
         }
         return strings;
+    }
+
+    public synchronized void sqlWrite(String sql) {
+        try (Connection conn = DriverManager.getConnection(url, userName, password);
+             Statement statement = conn.createStatement()){
+            statement.executeUpdate(sql);
+        } catch (SQLException e) {
+            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+        }
     }
 
     public synchronized void remove(int columnIndex, String id) {

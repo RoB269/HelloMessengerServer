@@ -7,14 +7,14 @@ import java.math.BigInteger;
 import java.util.logging.Logger;
 
 public class RSAServerKeys {
-    private static RSAKeys serverKeys;
+    private static RSAKeysPair serverKeys;
     private static final User SERVER = new User("#SERVER#");
     private static final Logger LOGGER = Logger.getLogger(RSAServerKeys.class.getName());
 
     public static void initKeys() {
         if (ResourcesIO.isExist("RSA/serverKeys.json")) {
             try {
-                RSAKeys serverKeys = ResourcesIO.readJSON("RSA/serverKeys.json", RSAKeys.class);
+                RSAKeysPair serverKeys = ResourcesIO.readJSON("RSA/serverKeys.json", RSAKeysPair.class);
                 if (serverKeys == null || serverKeys.getUser() == null) {
                     throw new NullPointerException();
                 }
@@ -33,12 +33,12 @@ public class RSAServerKeys {
 
     private static void writeNewKeys() {
         BigInteger[][] keys = RSA.generateKeys();
-        RSAServerKeys.serverKeys = new RSAKeys(keys, SERVER);
+        RSAServerKeys.serverKeys = new RSAKeysPair(keys, SERVER);
         ResourcesIO.writeJSON("RSA/serverKeys.json", serverKeys);
         LOGGER.fine("The keys were generated and written down");
     }
 
-    public static Key getPublicKey() {
+    public static UserKey getPublicKey() {
         return serverKeys.getPublicKey();
     }
 

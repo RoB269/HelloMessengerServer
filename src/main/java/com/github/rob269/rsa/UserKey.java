@@ -23,15 +23,15 @@ public class UserKey extends Key{
     }
 
     public static UserKey getFromDatabase(String userId) {
-        List<String> strings = Main.RSA_KEYS.readLine(5, userId);
-        if (strings.size() == 6){
+        List<String> strings = Main.RSA_KEYS.readLine(4, userId);
+        if (strings.size() == 5){
             return new UserKey(new BigInteger[]{
-                    new BigInteger(strings.get(1)),
-                    new BigInteger(strings.get(2))
+                    new BigInteger(strings.get(0)),
+                    new BigInteger(strings.get(1))
             }, new BigInteger[]{
-                    new BigInteger(strings.get(3)),
-                    new BigInteger(strings.get(4))
-            }, new User(strings.get(5)));
+                    new BigInteger(strings.get(2)),
+                    new BigInteger(strings.get(3))
+            }, new User(strings.get(4)));
         }
         else {
             return null;

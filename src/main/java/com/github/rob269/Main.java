@@ -1,7 +1,7 @@
 package com.github.rob269;
 
 import com.github.rob269.io.ClientIO;
-import com.github.rob269.io.DataBaseIO;
+import com.github.rob269.io.DataBaseTable;
 import com.github.rob269.logging.ConsoleFormatter;
 import com.github.rob269.rsa.RSAServerKeys;
 import com.github.rob269.rsa.WrongKeyException;
@@ -17,9 +17,9 @@ import java.util.logging.Logger;
 
 //Server
 public class Main {
-    public static final DataBaseIO RSA_KEYS = new DataBaseIO(DataBaseIO.Tables.USER_RSA_KEYS);
-    public static final DataBaseIO USERS = new DataBaseIO(DataBaseIO.Tables.USERS);
-    public static final DataBaseIO MESSAGES = new DataBaseIO(DataBaseIO.Tables.USER_MESSAGES);
+    public static final DataBaseTable RSA_KEYS = new DataBaseTable(DataBaseTable.Tables.USER_RSA_KEYS);
+    public static final DataBaseTable USERS = new DataBaseTable(DataBaseTable.Tables.USERS);
+    public static final DataBaseTable MESSAGES = new DataBaseTable(DataBaseTable.Tables.USER_MESSAGES);
     public volatile static Set<String> usersOnline = new HashSet<>();
     public volatile static Set<String> needToCheckMessages = new HashSet<>();
     private static boolean isOnline = true;
@@ -34,12 +34,14 @@ public class Main {
     private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
-        init();
+        RSAServerKeys.initKeys();
         try (ServerSocket serverSocket = new ServerSocket(5099)) {
             LOGGER.info("The server is running");
             while (isOnline) {
                 Socket clientSocket = serverSocket.accept();
-                new ConnectionMainThread(clientSocket).start();
+                ConnectionThread thread = new ConnectionThread(clientSocket);
+                thread.setName("MainConnectionThread-" + thread.getName().substring(7));
+                thread.start();
             }
         } catch (IOException e) {
             LOGGER.warning("Server can't start\n" + ConsoleFormatter.formatStackTrace(e));
@@ -49,19 +51,15 @@ public class Main {
     protected static void disableServer() {
         isOnline = false;
     }
-
-    private static void init() {
-        RSAServerKeys.initKeys();
-    }
 }
 
-class ConnectionMainThread extends Thread {
+class ConnectionThread extends Thread {
     public long handshakeTimer;
     Socket clientSocket;
 
-    private static final Logger LOGGER = Logger.getLogger(ConnectionMainThread.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ConnectionThread.class.getName());
 
-    public ConnectionMainThread(Socket clientSocket) {
+    public ConnectionThread(Socket clientSocket) {
         this.clientSocket = clientSocket;
         handshakeTimer = System.currentTimeMillis();
     }
@@ -69,23 +67,24 @@ class ConnectionMainThread extends Thread {
     @Override
     public void run() {
         LOGGER.info(Thread.currentThread().getName() + ": " + clientSocket.getInetAddress().toString() + " connected");
+        ClientIO clientIO = null;
         try {
             clientSocket.setSoTimeout((int) TimeUnit.SECONDS.toMillis(10));
+            clientIO = new ClientIO(clientSocket, handshakeTimer);
+            clientIO.init();
         } catch (SocketException e) {
             LOGGER.warning("Time out exception");
-        }
-        ClientIO clientIO = new ClientIO(clientSocket, handshakeTimer);
-        try {
-            clientIO.init();
         } catch (WrongKeyException e) {
             LOGGER.warning("Wrong Key\n" + ConsoleFormatter.formatStackTrace(e));
         }
-        try {
-            if (!clientIO.isClosed()) clientIO.close();
+        finally {
+            if (clientIO != null && !clientIO.isClosed()) clientIO.close();
             LOGGER.info(clientSocket.getInetAddress() + " disconnected");
-            clientSocket.close();
-        } catch (IOException e) {
-            LOGGER.warning("Exception at clientSocket.close()\n" + ConsoleFormatter.formatStackTrace(e));
+            try {
+                clientSocket.close();
+            } catch (IOException e) {
+                LOGGER.warning("Socket closing exception\n" + ConsoleFormatter.formatStackTrace(e));
+            }
         }
     }
 }

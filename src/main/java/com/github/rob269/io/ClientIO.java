@@ -5,17 +5,20 @@ import com.github.rob269.Message;
 import com.github.rob269.User;
 import com.github.rob269.logging.ConsoleFormatter;
 import com.github.rob269.rsa.*;
-import com.google.common.hash.Hashing;
 
 import java.io.*;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ClientIO {
+    private Socket clientSocket;
     private DataOutputStream dos;
     private DataInputStream dis;
     private Key clientKey;
@@ -23,22 +26,27 @@ public class ClientIO {
     private boolean initialized = false;
     private String userId = null;
     private long handshakeTimer;
+    private InputRouter router;
 
     private static final Logger LOGGER = Logger.getLogger(ClientIO.class.getName());
 
     public ClientIO(Socket clientSocket, long handshakeTimer) {
         try {
+            this.clientSocket = clientSocket;
             dos = new DataOutputStream(clientSocket.getOutputStream());
             dis = new DataInputStream(clientSocket.getInputStream());
             this.handshakeTimer = handshakeTimer;
+            router = new InputRouter(dis, this);
+            router.setName("InputThread-" + router.getName().substring(7));
+            router.start();
             LOGGER.fine("Output and Input streams is open");
         } catch (IOException e) {
             LOGGER.warning("Can't open streams\n" + ConsoleFormatter.formatStackTrace(e));
         }
     }
 
-    public String getUserId() {
-        return userId;
+    public boolean isInitialized() {
+        return initialized;
     }
 
     public boolean isClosed() {
@@ -47,16 +55,13 @@ public class ClientIO {
 
     public void init() throws WrongKeyException {
         while (!isClosed) {
-            String request = readFirst();
-            if (request.isEmpty()) {
-                close();
-                break;
-            }
-            if (!initialized){
-                handleInitialRequest(request);
-            }
-            else {
-                handleRequest(request);
+            byte request = readCommand();
+            if (!isClosed) {
+                if (!initialized) {
+                    handleInitialRequest(request);
+                } else {
+                    handleRequest(request);
+                }
             }
         }
     }
@@ -67,24 +72,13 @@ public class ClientIO {
             LOGGER.info("User key is approved");
             if (checkInitialization()) {
                 initialized = true;
-                List<String> login = read();
-                String hash = Hashing.sha256().hashString(login.get(1)+login.getFirst(), StandardCharsets.UTF_8).toString();
-                List<String> dbLine = Main.USERS.readLine(1, login.get(0));
-                if (!dbLine.isEmpty()) {
-                    if (!dbLine.get(2).equals(hash)) {
-                        write("AUTHENTICATION ERROR");
-                        close();
-                        return;
-                    }
-                }
-                else {
-                    Main.USERS.write(new String[]{login.getFirst(), hash, "NOW()"});
-                }
-                userId = login.getFirst();
-                Thread.currentThread().setName("{" + userId+"}MainThread");
-                Main.usersOnline.add(userId);
-                write("AUTHENTICATED");
                 LOGGER.warning("Handshake complete in " + (System.currentTimeMillis() - handshakeTimer) + "ms");
+                try {
+                    clientSocket.setSoTimeout(0);
+                    clientSocket.setKeepAlive(true);
+                } catch (SocketException e) {
+                    LOGGER.warning("Socket exception\n" + ConsoleFormatter.formatStackTrace(e));
+                }
             }
             else {
                 LOGGER.warning("Fail initialization");
@@ -92,84 +86,53 @@ public class ClientIO {
             }
         }
         else {
-            write("Wrong key");
+            writeCommand(63);
             throw new WrongKeyException("Wrong key");
         }
     }
 
     private boolean checkInitialization() {
-        write(RSA.encodeString("INITIALIZED", clientKey));
-        if (RSA.decodeString(readFirst(), RSAServerKeys.getPrivateKey()).equals("INITIALIZED")) {
-            write(RSA.encodeString("OK", clientKey));
+        byte[] bytes = RSA.encodeByteArray(new byte[]{30}, clientKey);
+        write(bytes, false);
+        if (readCommand() == 30) {
+            write(RSA.encodeByteArray(new byte[]{50}, clientKey), false);
             return true;
         }
         return false;
     }
 
-    private void handleRequest(String request) {
+    private void handleRequest(byte request) {
         switch (request) {
-            case "PING" -> write("PING", Level.FINEST);
-            case "KEEP ALIVE" -> write("OK KEEP ALIVE", Level.ALL);
-            case "EXIT" -> close();
-            case "SEND MESSAGE" -> {
-                List<String> messageStr = read();
-                Message message = new Message(messageStr.getFirst(), userId, messageStr.get(1));
-                Message.writeToDatabase(message);
-                if (Main.usersOnline.contains(messageStr.getFirst()))
-                    Main.needToCheckMessages.add(messageStr.getFirst());
-                write("MESSAGE OK");
-            }
-            case "CHECK" -> {
-                if (Main.needToCheckMessages.contains(userId)) {
-                    write("CHECK YES", Level.ALL);
+            case 90 -> writeCommand(90);//Ping
+            case 99 -> close();//Exit
+            case 23 -> {//Login
+                String userId = readString();
+                String password = readString();
+                String hash = sha256(password+userId);
+                List<String> dbLine = Main.USERS.readLine(1, userId);
+                if (!dbLine.isEmpty()) {
+                    if (!dbLine.get(2).equals(hash)) {
+                        writeCommand(62);
+                        close();
+                        return;
+                    }
                 }
                 else {
-                    write("CHECK NO", Level.ALL);
+                    String s = "INSERT INTO %s (user_id, password) VALUES ('%s', '%s');"
+                            .formatted(DataBaseTable.Tables.USERS.toString(), userId, hash);
+                    System.out.println(s);
+                    Main.USERS.sqlWrite(s);
                 }
-            }
-            case "GET NEW MESSAGES" -> {
-                List<String[]> messages = Main.MESSAGES.sqlRead
-                        ("SELECT * FROM hello_messenger_db.user_messages WHERE (SELECT last_online FROM hello_messenger_db.users WHERE user_id='%s') <= date AND recipient='%s';"
-                                .formatted(userId, userId));
-                Main.needToCheckMessages.remove(userId);
-                sendMessages(messages);
-            }
-            case "GET MESSAGES" -> {
-                List<String[]> messages = Main.MESSAGES.sqlRead(
-                        "SELECT * FROM hello_messenger_db.user_messages WHERE recipient='%s';".formatted(userId));
-                Main.needToCheckMessages.remove(userId);
-                sendMessages(messages);
-            }
-            case "GET MESSAGES COUNT" -> {
-                List<String[]> messages = Main.MESSAGES.sqlRead(
-                        "SELECT * FROM hello_messenger_db.user_messages WHERE recipient='%s';".formatted(userId));
-                write(String.valueOf(messages.size()));
-            }
-            case "GET SENT MESSAGES" -> {
-                List<String[]> messages = Main.MESSAGES.sqlRead(
-                        "SELECT * FROM hello_messenger_db.user_messages WHERE sender='%s'".formatted(userId)
-                );
-                sendSentMessages(messages);
-            }
-            case "GET SENT MESSAGES COUNT" -> {
-                List<String[]> messages = Main.MESSAGES.sqlRead(
-                        "SELECT * FROM hello_messenger_db.user_messages WHERE sender='%s';".formatted(userId));
-                write(String.valueOf(messages.size()));
-            }
-            case "SEND FILE" -> {
-                List<String> lines;
-                ResourcesIO.delete("files/file.txt");
-                long start = System.currentTimeMillis();
-                while (true){
-                    lines = read();
-                    if (lines.getFirst().equals("#END")) break;
-                    ResourcesIO.write("files/file.txt", lines, true);
-                }
-                LOGGER.warning("Complete in " + (System.currentTimeMillis()-start) + "ms");
+                this.userId = userId;
+                router.setName("InputThread{" + this.userId + "}");
+                Thread.currentThread().setName("MainConnectionThread{" + this.userId + "}");
+                Main.usersOnline.add(this.userId);
+                writeCommand(53);
             }
         }
     }
 
+    @Deprecated
     private void sendMessages(List<String[]> messages) {
         Map<String, List<Message>> messagesMap = new HashMap<>();
         for (String[] message : messages) {
@@ -193,6 +156,8 @@ public class ClientIO {
         write("#END", Level.ALL);
         Main.USERS.update(1, userId, 3, "NOW()");
     }
+
+    @Deprecated
     private void sendSentMessages(List<String[]> messages) {
         Map<String, List<Message>> messagesMap = new HashMap<>();
         for (String[] message : messages) {
@@ -216,102 +181,141 @@ public class ClientIO {
         write("#END", Level.ALL);
     }
 
-    private void handleInitialRequest(String request) throws WrongKeyException {
+    private static String sha256(String string) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(string.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) builder.append("0");
+                builder.append(hex);
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            LOGGER.warning("SHA-256 algorithm exception:\n" + ConsoleFormatter.formatStackTrace(e));
+        }
+        return null;
+    }
+
+    private void handleInitialRequest(byte request) throws WrongKeyException {
         switch (request) {
-            case "GET RSA KEY" -> write(RSAServerKeys.getPublicKey().toString());
-            case "KEY" -> {
-                List<String> lines = read();
-                if (lines.size() >= 5) {
-                    BigInteger[] keyInteger = new BigInteger[]{
-                            new BigInteger(lines.get(0)),
-                            new BigInteger(lines.get(1))
-                    };
-                    User user = new User(RSA.decodeString(lines.get(4), RSAServerKeys.getPrivateKey()));
-                    UserKey clientKey = new UserKey(keyInteger, user);
-                    BigInteger[] meta = new BigInteger[]{
-                            new BigInteger(lines.get(2)),
-                            new BigInteger(lines.get(3))
-                    };
-                    clientKey.setMeta(meta);
-                    initClientKey(clientKey);
-                }
-                else {
-                    LOGGER.warning("Wrong key format");
-                    write("WRONG KEY FORMAT");
-                }
+            case 10 -> {//Get rsa keys
+                writeCommand(52);
+                UserKey userKey = RSAServerKeys.getPublicKey();
+                BigInteger[] key = userKey.getKey();
+                BigInteger[] meta = userKey.getMeta();
+                writePackageCount(5);
+                for (BigInteger integer : key) write(integer);
+                for (BigInteger integer : meta) write(integer);
+                write(userKey.getUser().getId());
             }
-            case "REGISTER NEW KEY" -> {
-                List<String> lines = read();
-                if (lines.size()>=3) {
-                    UserKey newKey = new UserKey(new BigInteger[]{new BigInteger(lines.getFirst()), new BigInteger(lines.get(1))},
-                            new User(RSA.decodeString(lines.get(2), RSAServerKeys.getPrivateKey())));
-                    if (!RSAKeys.isIdentified(newKey)) {
-                        UserKey keyToReturn;
-                        RSAKeys.registerNewKey(newKey, false);
-                        keyToReturn = UserKey.getFromDatabase(newKey.getUser().getId());
-                        if (keyToReturn == null) {
-                            LOGGER.warning("Key is null");
-                            write("500 ERROR");
-                            return;
-                        }
-                        write("META");
-                        write(keyToReturn.getMeta()[0] + "\n" + keyToReturn.getMeta()[1] + "\n");
-                    } else {
-                        LOGGER.warning("Key is already registered");
-                        write("KEY IS REJECTED");
+            case 20 -> {//Key
+                BigInteger[] key = new BigInteger[2];
+                BigInteger[] meta = new BigInteger[2];
+                for (int i = 0; i < 2; i++) key[i] = readBigint();
+                for (int i = 0; i < 2; i++) meta[i] = readBigint();
+                User user = new User(new String(RSA.decodeByteArray(read(), RSAServerKeys.getPrivateKey())));
+                UserKey clientKey = new UserKey(key, user);
+                clientKey.setMeta(meta);
+                initClientKey(clientKey);
+            }
+            case 21 -> {//Register new key
+                BigInteger[] key = new BigInteger[2];
+                for (int i = 0; i < 2; i++) key[i] = readBigint();
+                String user = RSA.decodeByteToString(read(), RSAServerKeys.getPrivateKey());
+                UserKey newKey = new UserKey(key, new User(user));
+                if (!RSAKeysPair.isIdentified(newKey)) {
+                    UserKey keyToReturn;
+                    RSAKeysPair.registerNewKey(newKey, false);
+                    keyToReturn = UserKey.getFromDatabase(newKey.getUser().getId());
+                    if (keyToReturn == null) {
+                        LOGGER.warning("Key is null");
+                        writeCommand(60);
+                        return;
                     }
-                }
-                else {
-                    LOGGER.warning("Wrong key format");
-                    write("WRONG KEY FORMAT");
+                    writeCommand(51);
+                    writePackageCount(2);
+                    for (int i = 0; i < 2; i++) write(keyToReturn.getMeta()[i]);
+                } else {
+                    LOGGER.warning("Key is already registered");
+                    writeCommand(61);
                 }
             }
-            case "RESET KEY" -> {
-                List<String> login = List.of(RSA.decodeString(readFirst(), RSAServerKeys.getPrivateKey()).split("\n"));
-                List<String> dbResponse = Main.USERS.readLine(1, login.getFirst());
-                String hash = Hashing.sha256().hashString(login.get(1)+login.getFirst(), StandardCharsets.UTF_8).toString();
+            case 22 -> {//Reset
+                String user = RSA.decodeByteToString(read(), RSAServerKeys.getPrivateKey());
+                String password = RSA.decodeByteToString(read(), RSAServerKeys.getPrivateKey());
+                List<String> dbResponse = Main.USERS.readLine(1, user);
+                String hash = sha256(password+user);
                 if ((!dbResponse.isEmpty()) && (!dbResponse.get(2).equals(hash))){
-                    write("AUTHENTICATION ERROR");
+                    writeCommand(62);
                     close();
                     return;
                 }
-                Main.RSA_KEYS.remove(5, login.getFirst());
-                write("OK");
+                Main.RSA_KEYS.remove(4, user);
+                writeCommand(50);
             }
+            case 0 -> close();
         }
     }
 
-    public String readFirst(){
-        List<String> list = read();
-        if (list != null && !list.isEmpty()) {
-            return list.getFirst();
+    public String readString() {
+        byte[] bytes = read();
+        if (bytes != null){
+            String string = new String(bytes);
+            LOGGER.finer("Get message:\n" + string);
+            return string;
         }
-        return "";
+        return null;
     }
 
-    public List<String> read() {
-        return read(Level.FINER);
+    public byte readCommand() {
+        byte[] bytes = read();
+        if (bytes != null) {
+            byte command = bytes[0];
+            LOGGER.finer("Get command:\n" + command);
+            return command;
+        }
+        return 0;
     }
 
-    public List<String> read(Level loggingLevel) {
-        List<String> lines = new ArrayList<>();
-        if (!isClosed){
-            try {
-                String inputString = dis.readUTF();
-                if (initialized) {
-                    inputString = RSA.decodeString(inputString, RSAServerKeys.getPrivateKey());
+    public BigInteger readBigint() {
+        byte[] bytes = read();
+        if (bytes != null) {
+            BigInteger bigint = new BigInteger(bytes);
+            LOGGER.finer("Get message:\n" + bigint);
+            return bigint;
+        }
+        return null;
+    }
+
+    public byte[] read() {
+        byte[] result = null;
+        if (Thread.currentThread().getName().startsWith("Main")) {
+            synchronized (router.mainThreadInput) {
+                while (router.mainThreadInput.isEmpty() && !isClosed) {
+                    try {
+                        router.mainThreadInput.wait();
+                    } catch (InterruptedException e) {
+                        LOGGER.warning("Threads exception\n" + ConsoleFormatter.formatStackTrace(e));
+                    }
                 }
-                lines = new ArrayList<>(List.of(inputString.split("\n")));
-                StringBuilder stringBuilder = new StringBuilder();
-                for (String line : lines)
-                    stringBuilder.append(line).append("\n");
-                String log = (stringBuilder.toString().endsWith("\n") ? stringBuilder.substring(0, stringBuilder.length() - 1) : stringBuilder.toString());
-                if (!log.equals("KEEP ALIVE") && !log.equals("CHECK")) LOGGER.log(loggingLevel, "Get message:\n" + log);
-            } catch (IOException e) {
-                LOGGER.warning("Can't read lines\n" + ConsoleFormatter.formatStackTrace(e));
+                result = router.mainThreadInput.poll();
             }
         }
-        return lines;
+        else if (Thread.currentThread().getName().startsWith("Side")){
+            synchronized (router.sideThreadInput) {
+                while (router.sideThreadInput.isEmpty() && !isClosed) {
+                    try {
+                        router.sideThreadInput.wait();
+                    } catch (InterruptedException e) {
+                        LOGGER.warning("Threads exception\n" + ConsoleFormatter.formatStackTrace(e));
+                    }
+                }
+                result = router.sideThreadInput.poll();
+            }
+        }
+        return result;
     }
 
     public void write(String message) {
@@ -319,17 +323,26 @@ public class ClientIO {
     }
 
     public void write(String message, Level loggingLevel) {
-        if (message == null) {
-            LOGGER.warning("Null message");
-            return;
-        }
         if (!isClosed){
+            write(message.getBytes());
+            LOGGER.log(loggingLevel, "Message sent:\n" + message);
+        }
+    }
+
+    public void write(BigInteger message) {
+        LOGGER.finer("Write bigint:\n" + message);
+        write(message.toByteArray());
+    }
+
+    public void writeCommand(int message) {
+        LOGGER.finer("Write command: " + message);
+        write(new byte[]{(byte) message}, false);
+    }
+
+    public void writePackageCount(int count) {
+        if (!isClosed) {
             try {
-                String log = (message.endsWith("\n") ? message.substring(0, message.length() - 1) : message);
-                LOGGER.log(loggingLevel, "Message sent:\n" + log);
-                if (initialized)
-                    message = RSA.encodeString(message, clientKey);
-                dos.writeUTF(message);
+                dos.writeInt(count);
                 dos.flush();
             } catch (IOException e) {
                 LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
@@ -337,20 +350,17 @@ public class ClientIO {
         }
     }
 
-    public void write(List<String> lines) {
-        if (lines == null || lines.isEmpty()) {
-            LOGGER.warning("Null message");
-            return;
-        }
-        if (!isClosed){
-            StringBuilder stringBuilder = new StringBuilder();
-            for (String line : lines)
-                stringBuilder.append(line).append("\n");
-            String message = stringBuilder.toString();
-            LOGGER.finer("Sending message:\n" + (message.endsWith("\n") ? message.substring(0, message.length() - 1) : message));
+    public void write(byte[] message) {
+        write(message, true);
+    }
+
+    public void write(byte[] message, boolean sendPackageSize) {
+        if (!isClosed) {
+            LOGGER.finest("Sending byte message");
             try {
-                if (initialized) message = RSA.encodeString(message, clientKey);
-                dos.writeUTF(message);
+                if (initialized) message = RSA.encodeByteArray(message, clientKey);
+                if (sendPackageSize) dos.writeInt(message.length);
+                dos.write(message);
                 dos.flush();
             } catch (IOException e) {
                 LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
@@ -364,8 +374,40 @@ public class ClientIO {
         try {
             dis.close();
             dos.close();
+            router.close();
+            LOGGER.info("ClientIO closed");
         } catch (IOException e) {
             LOGGER.warning("Can't close streams");
         }
     }
 }
+
+/*
+Handshake codes:
+Requests:
+     0 - Exit
+    10 - Get Server public key -
+    20 - User sending his public key +
+    21 - User registering new key +
+    22 - User resets the key +
+
+Responses:
+    50 - OK-
+    51 - Sending meta+
+    52 - Sending server public key+
+    53 - AUTHENTICATED-
+    60 - Error-
+    61 - Key is rejected(already exist)-
+    62 - AUTHENTICATION ERROR-
+    63 - Wrong key-
+    30 - Check initialization
+
+Codes:
+Requests:
+    23 - Login
+    90 - Ping
+    0 - Exit
+Responses:
+    50 - OK
+    60 - Error
+*/
