@@ -87,38 +87,24 @@ public class RSA {
             if (byteVar.compareTo(BigInteger.ZERO) < 0) byteVar = byteVar.add(n256);
             integerString[j] = integerString[j].add(byteVar.multiply(n256.pow(i%MAX_PACKAGE_SIZE)));
         }
-        byte[] encodedByteString = new byte[integerString.length*129];
+        byte[] encodedByteString = new byte[integerString.length*130];
         for (int i = 0; i < integerString.length; i++) {
             BigInteger integer = RSA.encode(integerString[i], key);
             byte[] bytes = integer.toByteArray();
-            if (bytes.length == 128) {
-                encodedByteString[129*i] = 1;
-                for (int k = 0; k < 128; k++) {
-                    encodedByteString[129*i+1+k] = bytes[k];
-                }
-            }
-            else {
-                System.arraycopy(bytes, 0, encodedByteString, 129 * i, 129);
-            }
+            System.arraycopy(bytes, 0, encodedByteString, 130 * i, bytes.length);
+            encodedByteString[130*i+129] = (byte)(129 - bytes.length);
         }
         return encodedByteString;
     }
 
     public static byte[] decodeByteArray(byte[] byteString, Key key) {
-        byte[] bytePackage129 = new byte[129];
-        byte[] bytePackage128 = new byte[128];
-        byte[] decodedByteString = new byte[byteString.length/129*64];
+        byte[] bytePackage;
+        byte[] decodedByteString = new byte[byteString.length/130*64];
         int ind = 0;
-        for (int i = 0; i < byteString.length/129; i++) {
-            BigInteger integer;
-            if (byteString[i*129] == 0) {
-                System.arraycopy(byteString, i * 129, bytePackage129, 0, 129);
-                integer = new BigInteger(bytePackage129);
-            }
-            else {
-                for (int j = 0; j < 128; j++) bytePackage128[j] = byteString[i * 129 + 1 + j];
-                integer = new BigInteger(bytePackage128);
-            }
+        for (int i = 0; i < byteString.length/130; i++) {
+            bytePackage = new byte[129 - byteString[i*130+129]];
+            System.arraycopy(byteString, i*130, bytePackage, 0, bytePackage.length);
+            BigInteger integer = new BigInteger(bytePackage);
             integer = decode(integer, key);
             while (integer.compareTo(BigInteger.ZERO) != 0) {
                 int mod = integer.mod(n256).intValue();
