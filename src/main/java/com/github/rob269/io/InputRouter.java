@@ -32,7 +32,7 @@ public class InputRouter extends Thread {
                 byte[] input = new byte[130];
                 int inputSize = dis.read(input);
                 int command;
-                if (inputSize == -1) {
+                if (inputSize == -1 || inputSize != 130 && (clientIO.isInitialized() || input[0] == 30)) {
                     mainThreadInput.add(new byte[]{0});
                     break;
                 } else if (inputSize == 130) {
