@@ -1,5 +1,6 @@
 package com.github.rob269.io;
 
+import com.github.rob269.Main;
 import com.github.rob269.logging.ConsoleFormatter;
 
 import java.sql.*;
@@ -10,7 +11,7 @@ import java.util.logging.Logger;
 public class DataBaseTable {
     public static final Logger LOGGER = Logger.getLogger(DataBaseTable.class.getName());
     private static final String userName = "root";
-    private static final String password = "root";
+    private static String password = null;
     private static final String url = "jdbc:mysql://127.0.0.1:3306/hello_messenger_db";
     private final List<String> columns;
     private final List<String> dataTypes;
@@ -43,6 +44,15 @@ public class DataBaseTable {
         public String toString() {
             return str;
         }
+    }
+
+    public static void init(String password) {
+        if (DataBaseTable.password == null) {
+            DataBaseTable.password = password;
+            Main.USERS = new DataBaseTable(DataBaseTable.Tables.USERS);
+            Main.MESSAGES = new DataBaseTable(DataBaseTable.Tables.USER_MESSAGES);
+        }
+
     }
 
     public DataBaseTable(Tables table) {

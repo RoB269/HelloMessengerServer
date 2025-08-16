@@ -2,11 +2,15 @@ package com.github.rob269;
 
 import com.github.rob269.io.ClientIO;
 import com.github.rob269.io.DataBaseTable;
+import com.github.rob269.io.ResourcesIO;
 import com.github.rob269.logging.ConsoleFormatter;
+import com.github.rob269.rsa.Guarantor;
+import com.github.rob269.rsa.Key;
 import com.github.rob269.rsa.RSAServerKeys;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -16,8 +20,8 @@ import java.util.logging.Logger;
 
 //Server
 public class Main {
-    public static final DataBaseTable USERS = new DataBaseTable(DataBaseTable.Tables.USERS);
-    public static final DataBaseTable MESSAGES = new DataBaseTable(DataBaseTable.Tables.USER_MESSAGES);
+    public static DataBaseTable USERS;
+    public static DataBaseTable MESSAGES;
     public volatile static Set<String> usersOnline = new HashSet<>();
     public volatile static Set<String> needToCheckMessages = new HashSet<>();
     private static ServerSocket serverSocket;
@@ -31,7 +35,38 @@ public class Main {
     }
     private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
 
+    private static void parseConfigFile() {
+        BigInteger[] publicKey = null;
+        BigInteger[] privateKey = null;
+        String db_root_password = null;
+        StringBuilder builder = new StringBuilder();
+        for (String line : ResourcesIO.read("config")) builder.append(line);
+        String[] configs = builder.toString().replaceAll(" ", "").split(";");
+        for (String config : configs) {
+            if (config.startsWith("guarantor_private_key")) {
+                String[] key = config.split("=")[1].split(",");
+                privateKey = new BigInteger[]{new BigInteger(key[0]), new BigInteger(key[1])};
+            }
+            else if (config.startsWith("guarantor_public_key")) {
+                String[] key = config.split("=")[1].split(",");
+                publicKey = new BigInteger[]{new BigInteger(key[0]), new BigInteger(key[1])};
+            }
+            else if (config.startsWith("db_root_password")) {
+                db_root_password = config.split("=")[1];
+            }
+        }
+        if (publicKey != null && privateKey != null && db_root_password != null) {
+            DataBaseTable.init(db_root_password);
+            Guarantor.init(new Key(publicKey), new Key(privateKey));
+        }
+        else {
+            LOGGER.severe("The configuration file does not contain the necessary data");
+            throw new RuntimeException();
+        }
+    }
+
     public static void main(String[] args) {
+        parseConfigFile();
         RSAServerKeys.initKeys();
         try {
             serverSocket = new ServerSocket(5099);
