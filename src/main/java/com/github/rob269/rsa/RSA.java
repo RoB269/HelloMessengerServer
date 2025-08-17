@@ -102,9 +102,10 @@ public class RSA {
         byte[] decodedByteString = new byte[byteString.length/130*64];
         int ind = 0;
         for (int i = 0; i < byteString.length/130; i++) {
-            bytePackage = new byte[129 - byteString[i*130+129]];
+            bytePackage = new byte[129 - ((int) byteString[i*130+129] & 0xff)];
             System.arraycopy(byteString, i*130, bytePackage, 0, bytePackage.length);
             BigInteger integer = new BigInteger(bytePackage);
+            if (integer.compareTo(BigInteger.ZERO) == 0) return new byte[]{0};
             integer = decode(integer, key);
             while (integer.compareTo(BigInteger.ZERO) != 0) {
                 int mod = integer.mod(n256).intValue();
