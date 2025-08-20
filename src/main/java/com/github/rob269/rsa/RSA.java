@@ -81,11 +81,18 @@ public class RSA {
     public static byte[] encodeByteArray(byte[] byteString, Key key) {
         BigInteger[] integerString = new BigInteger[(int) Math.ceil((double) byteString.length / MAX_PACKAGE_SIZE)];
         Arrays.fill(integerString, BigInteger.ZERO);
-        for (int i = 0, j; i < byteString.length; i++) {
-            j = i/MAX_PACKAGE_SIZE;
-            BigInteger byteVar = BigInteger.valueOf(byteString[i]);
-            if (byteVar.compareTo(BigInteger.ZERO) < 0) byteVar = byteVar.add(n256);
-            integerString[j] = integerString[j].add(byteVar.multiply(n256.pow(i%MAX_PACKAGE_SIZE)));
+        int lastPackageSize = byteString.length%MAX_PACKAGE_SIZE;
+        int packageCount = (int) Math.ceil((double) byteString.length/MAX_PACKAGE_SIZE);
+        byte[] bytePackage = new byte[MAX_PACKAGE_SIZE+1];
+        bytePackage[0] = 1;
+        for (int i = 0; i < packageCount; i++) {
+            if (i != packageCount-1 || lastPackageSize == 0) System.arraycopy(byteString, i*MAX_PACKAGE_SIZE, bytePackage, 1, MAX_PACKAGE_SIZE);
+            else {
+                bytePackage = new byte[lastPackageSize+1];
+                bytePackage[0] = 1;
+                System.arraycopy(byteString, i*MAX_PACKAGE_SIZE, bytePackage, 1, lastPackageSize);
+            }
+            integerString[i] = new BigInteger(bytePackage);
         }
         byte[] encodedByteString = new byte[integerString.length*130];
         for (int i = 0; i < integerString.length; i++) {
@@ -99,20 +106,17 @@ public class RSA {
 
     public static byte[] decodeByteArray(byte[] byteString, Key key) {
         byte[] bytePackage;
-        byte[] decodedByteString = new byte[byteString.length/130*64];
+        byte[] decodedByteString = new byte[byteString.length/130*MAX_PACKAGE_SIZE];
         int ind = 0;
         for (int i = 0; i < byteString.length/130; i++) {
             bytePackage = new byte[129 - ((int) byteString[i*130+129] & 0xff)];
             System.arraycopy(byteString, i*130, bytePackage, 0, bytePackage.length);
             BigInteger integer = new BigInteger(bytePackage);
             if (integer.compareTo(BigInteger.ZERO) == 0) return new byte[]{0};
-            integer = decode(integer, key);
-            while (integer.compareTo(BigInteger.ZERO) != 0) {
-                int mod = integer.mod(n256).intValue();
-                decodedByteString[ind] = (byte) mod;
-                integer = integer.divide(n256);
-                ind++;
-            }
+            integer = RSA.decode(integer, key);
+            byte[] bytes = integer.toByteArray();
+            System.arraycopy(bytes, 1, decodedByteString, ind, bytes.length-1);
+            ind+=bytes.length-1;
         }
         byte[] result = new byte[ind];
         System.arraycopy(decodedByteString, 0, result, 0, ind);
