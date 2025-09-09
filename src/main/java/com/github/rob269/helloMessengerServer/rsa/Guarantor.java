@@ -1,11 +1,4 @@
-package com.github.rob269.rsa;
-
-import com.github.rob269.User;
-import com.github.rob269.io.ResourcesIO;
-
-import java.io.IOException;
-import java.math.BigInteger;
-import java.util.List;
+package com.github.rob269.helloMessengerServer.rsa;
 
 public class Guarantor {
     private static Key privateKey = null;

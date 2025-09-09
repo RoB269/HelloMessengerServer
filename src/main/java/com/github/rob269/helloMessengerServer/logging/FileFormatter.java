@@ -1,4 +1,4 @@
-package com.github.rob269.logging;
+package com.github.rob269.helloMessengerServer.logging;
 
 import java.time.LocalDateTime;
 import java.util.logging.Formatter;

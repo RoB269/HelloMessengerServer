@@ -42,7 +42,7 @@
                         <configuration>
                             <archive>
                                 <manifest>
-                                    <mainClass>com.github.rob269.Main</mainClass>
+                                    <mainClass>com.github.rob269.helloMessengerServer.Main</mainClass>
                                 </manifest>
                             </archive>
                             <descriptorRefs>jar-with-dependencies</descriptorRefs>

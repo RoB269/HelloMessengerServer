@@ -1,6 +1,6 @@
-package com.github.rob269.rsa;
+package com.github.rob269.helloMessengerServer.rsa;
 
-import com.github.rob269.User;
+import com.github.rob269.helloMessengerServer.User;
 
 import java.math.BigInteger;
 
@@ -22,6 +22,10 @@ public class UserKey extends Key{
 
     public User getUser() {
         return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public BigInteger[] getMeta() {

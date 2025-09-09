@@ -1,6 +1,6 @@
-package com.github.rob269.io;
+package com.github.rob269.helloMessengerServer.io;
 
-import com.github.rob269.logging.ConsoleFormatter;
+import com.github.rob269.helloMessengerServer.logging.ConsoleFormatter;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -45,7 +45,7 @@ public class ResourcesIO {
 
     public synchronized static void write(String filePath, List<String> lines, boolean append) {
         File file = new File(RESOURCES_FOLDER + filePath);
-        if (file.getParentFile().exists()) {
+        if (!file.getParentFile().exists()) {
             file.getParentFile().mkdirs();
         }
         if (!file.exists()) {

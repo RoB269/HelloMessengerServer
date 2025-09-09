@@ -1,11 +1,6 @@
-package com.github.rob269.rsa;
-
-import com.github.rob269.Main;
-import com.github.rob269.User;
-import com.github.rob269.io.ResourcesIO;
+package com.github.rob269.helloMessengerServer.rsa;
 
 import java.math.BigInteger;
-import java.util.List;
 
 public class Key {
     private final BigInteger[] key = new BigInteger[2];

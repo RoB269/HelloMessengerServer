@@ -1,4 +1,4 @@
-package com.github.rob269.logging;
+package com.github.rob269.helloMessengerServer.logging;
 
 import java.time.LocalDateTime;
 import java.util.logging.Formatter;
@@ -8,7 +8,7 @@ public class ConsoleFormatter extends Formatter {
     @Override
     public String format(LogRecord record) {
         LocalDateTime dateTime = LocalDateTime.now();
-        return "[" + dateTime.toString().substring(11) + "]" + record.getLevel().getName() + "(" + Thread.currentThread().getName() + "): " + record.getMessage().replaceAll("\n", "\n\t") + "\n";
+        return (record.getSourceClassName().contains("jdk.internal.event") ? record.getSourceClassName() : "") + "[" + dateTime.toString().substring(11) + "]" + record.getLevel().getName() + "(" + Thread.currentThread().getName() + "): " + record.getMessage().replaceAll("\n", "\n\t") + "\n";
     }
 
     public static String formatStackTrace(Exception e) {

@@ -1,6 +1,6 @@
-package com.github.rob269.rsa;
+package com.github.rob269.helloMessengerServer.rsa;
 
-import com.github.rob269.User;
+import com.github.rob269.helloMessengerServer.User;
 import com.google.gson.annotations.SerializedName;
 
 import java.math.BigInteger;
@@ -10,12 +10,12 @@ public class RSAKeysPair {
     private final UserKey publicKey;
     @SerializedName("private_key")
     private final Key privateKey;
-    private final User adminId;
+    private final User admin;
 
-    public RSAKeysPair(BigInteger[][] keys, User adminId) {
-        this.publicKey = addMeta(new UserKey(keys[0], adminId));
+    public RSAKeysPair(BigInteger[][] keys, User admin) {
+        this.publicKey = addMeta(new UserKey(keys[0], admin));
         this.privateKey = new Key(keys[1]);
-        this.adminId = adminId;
+        this.admin = admin;
     }
 
     public UserKey getPublicKey() {
@@ -26,8 +26,8 @@ public class RSAKeysPair {
         return privateKey;
     }
 
-    public User getAdminId() {
-        return adminId;
+    public User getAdmin() {
+        return admin;
     }
 
     private static UserKey addMeta(UserKey key) {
@@ -41,7 +41,7 @@ public class RSAKeysPair {
                 publicKey.toString() +
                 "private_key:\n" +
                 privateKey.toString() +
-                adminId.toString();
+                admin.toString();
     }
 
     @Override

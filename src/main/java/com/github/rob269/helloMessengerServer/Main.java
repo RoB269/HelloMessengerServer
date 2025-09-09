@@ -1,44 +1,53 @@
-package com.github.rob269;
+package com.github.rob269.helloMessengerServer;
 
-import com.github.rob269.io.ClientIO;
-import com.github.rob269.io.DataBaseTable;
-import com.github.rob269.io.ResourcesIO;
-import com.github.rob269.logging.ConsoleFormatter;
-import com.github.rob269.rsa.Guarantor;
-import com.github.rob269.rsa.Key;
-import com.github.rob269.rsa.RSAServerKeys;
+import com.github.rob269.helloMessengerServer.io.ClientIO;
+import com.github.rob269.helloMessengerServer.io.DatabaseInterface;
+import com.github.rob269.helloMessengerServer.io.ResourcesIO;
+import com.github.rob269.helloMessengerServer.logging.ConsoleFormatter;
+import com.github.rob269.helloMessengerServer.logging.LogFilter;
+import com.github.rob269.helloMessengerServer.rsa.Guarantor;
+import com.github.rob269.helloMessengerServer.rsa.Key;
+import com.github.rob269.helloMessengerServer.rsa.RSAServerKeys;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 //Server
 public class Main {
-    public static DataBaseTable USERS;
-    public static DataBaseTable MESSAGES;
-    public volatile static Set<String> usersOnline = new HashSet<>();
-    public volatile static Set<String> needToCheckMessages = new HashSet<>();
+    public volatile static Map<String, SideConnectionThread> onlineUsersThreads = new HashMap<>();
     private static ServerSocket serverSocket;
     static {
+        System.setErr(new PrintStream(new LogFilter(System.err)));
         File logsDir = new File("log/");
         if (!logsDir.exists()) {
             if (!logsDir.mkdir()) {
                 throw new RuntimeException();
             }
         }
+        try {
+            LogManager.getLogManager().readConfiguration(Objects.requireNonNull(Main.class.getResource("log.properties")).openStream());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
     private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
 
-    private static void parseConfigFile() {
+    private static void parseConfigFile() throws SQLException {
+        if (!ResourcesIO.isExist("config")) {
+            ResourcesIO.write("config", new ArrayList<>());
+            LOGGER.severe("The configuration file does not exists");
+            throw new RuntimeException();
+        }
         BigInteger[] publicKey = null;
         BigInteger[] privateKey = null;
-        String db_root_password = null;
+        String dbRootPassword = null;
         StringBuilder builder = new StringBuilder();
         for (String line : ResourcesIO.read("config")) builder.append(line);
         String[] configs = builder.toString().replaceAll(" ", "").split(";");
@@ -52,11 +61,11 @@ public class Main {
                 publicKey = new BigInteger[]{new BigInteger(key[0]), new BigInteger(key[1])};
             }
             else if (config.startsWith("db_root_password")) {
-                db_root_password = config.split("=")[1];
+                dbRootPassword = config.split("=")[1];
             }
         }
-        if (publicKey != null && privateKey != null && db_root_password != null) {
-            DataBaseTable.init(db_root_password);
+        if (publicKey != null && privateKey != null && dbRootPassword != null) {
+            DatabaseInterface.init(dbRootPassword);
             Guarantor.init(new Key(publicKey), new Key(privateKey));
         }
         else {
@@ -66,11 +75,16 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        parseConfigFile();
+        try {
+            parseConfigFile();
+        } catch (SQLException e) {
+            LOGGER.warning("Can't connect to database");
+            throw new RuntimeException(e);
+        }
         RSAServerKeys.initKeys();
         try {
             serverSocket = new ServerSocket(5099);
-            LOGGER.info("The server is running");
+            LOGGER.warning("The server is running");
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     Socket clientSocket = serverSocket.accept();
@@ -101,29 +115,28 @@ public class Main {
 }
 
 class ConnectionThread extends Thread {
-    public long handshakeTimer;
     Socket clientSocket;
 
     private static final Logger LOGGER = Logger.getLogger(ConnectionThread.class.getName());
 
     public ConnectionThread(Socket clientSocket) {
         this.clientSocket = clientSocket;
-        handshakeTimer = System.currentTimeMillis();
     }
 
     @Override
     public void run() {
-        LOGGER.info(Thread.currentThread().getName() + ": " + clientSocket.getInetAddress().toString() + " connected");
+        LOGGER.info(clientSocket.getInetAddress().toString() + " connected");
         ClientIO clientIO = null;
         try {
-            clientSocket.setSoTimeout((int) TimeUnit.SECONDS.toMillis(10));
-            clientIO = new ClientIO(clientSocket, handshakeTimer);
+            clientSocket.setSoTimeout(3_000);
+            clientIO = new ClientIO(clientSocket);
             clientIO.init();
         } catch (SocketException e) {
             LOGGER.warning("Time out exception");
-        } catch (IOException ignored) {
-        }
-        finally {
+        } catch (IOException _) {
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
             if (clientIO != null && !clientIO.isClosed()) clientIO.close();
             LOGGER.info(clientSocket.getInetAddress() + " disconnected");
             try {
