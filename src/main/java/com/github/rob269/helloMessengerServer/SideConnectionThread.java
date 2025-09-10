@@ -9,18 +9,41 @@ import java.util.logging.Logger;
 public class SideConnectionThread extends Thread {
     private static final Logger LOGGER = Logger.getLogger(SideConnectionThread.class.getName());
     private final ClientIO clientIO;
-    private volatile Message newMessage = new Message();
-    private volatile boolean hasNewMessage = false;
+    private volatile int command = 0;
+    private final Object monitor = new Object();
+
+    private Message newMessage;
+    private Chat chat;
 
     public SideConnectionThread(ClientIO clientIO) {
         this.clientIO = clientIO;
     }
 
     public void newMessage(Message message) {
-        synchronized (newMessage) {
-            newMessage.update(message);
-            hasNewMessage = true;
-            newMessage.notify();
+        synchronized (monitor) {
+            while (command != 0) {
+                try {
+                    monitor.wait();
+                } catch (InterruptedException _) {
+                }
+            }
+            newMessage = message;
+            command = -10;
+            monitor.notify();
+        }
+    }
+
+    public void newChat(Chat chat) {
+        synchronized (monitor) {
+            while (command != 0) {
+                try {
+                    monitor.wait();
+                } catch (InterruptedException _) {
+                }
+            }
+            this.chat = chat;
+            command = -11;
+            monitor.notify();
         }
     }
 
@@ -30,17 +53,32 @@ public class SideConnectionThread extends Thread {
                 ";";
     }
 
+    private String formatChat(Chat chat) {
+        Message message = chat.lastMessage();
+        return chat.chatId() + "\\\\" + chat.name() + "\\\\" + message.getMessageId() + "\\\\" + message.getSender() +
+                "\\\\" + message.getDate() + "\\\\" + message.getMessage().replaceAll("\\\\", "\\\\&") + "\\\\" + (chat.isPrivate() ? "1" : "0") + "\\\\;";
+    }
+
     @Override
     public void run() {
         try {
             while (!clientIO.isClosed()) {
-                synchronized (newMessage) {
-                    while (!clientIO.isClosed() && !hasNewMessage) {
-                        newMessage.wait();
+                synchronized (monitor) {
+                    while (!clientIO.isClosed() && command == 0) {
+                        monitor.wait();
                     }
-                    hasNewMessage = false;
-                    HMPBatch batch = clientIO.writeBatch(-10, 1, false);
-                    batch.write(formatMessage(newMessage));
+                    switch (command) {
+                        case -10 -> {
+                            HMPBatch batch = clientIO.writeBatch(-10, 1, false);
+                            batch.write(formatMessage(newMessage));
+                        }
+                        case -11 -> {
+                            HMPBatch batch = clientIO.writeBatch(-11, 1, false);
+                            batch.write(formatChat(chat));
+                        }
+                    }
+                    command = 0;
+                    monitor.notify();
                 }
             }
         } catch (IOException | InterruptedException _) {}

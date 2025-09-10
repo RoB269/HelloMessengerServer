@@ -19,14 +19,6 @@ public class Message {
         this.message = message;
     }
 
-    public void update(Message message) {
-        this.chatId = message.chatId;
-        this.messageId = message.messageId;
-        this.sender = message.sender;
-        this.message = message.message;
-        this.date = message.date;
-    }
-
     @Override
     public String toString() {
         return "(" + date.toString() + ")" + sender + ": " + message;

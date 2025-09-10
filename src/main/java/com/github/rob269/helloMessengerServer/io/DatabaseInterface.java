@@ -40,7 +40,7 @@ LEFT JOIN user_messages um ON um.chat_id = a.chat_id AND a.last_message_id = um.
 LEFT JOIN users u ON b.sender = u.user_id
                             """));
         statements.add(conn.prepareStatement("SELECT chat_id FROM contacts WHERE (user_1 = ? AND user_2 = ?) OR (user_1 = ? AND user_2 = ?)"));//   5
-        statements.add(conn.prepareStatement("INSERT INTO chat_connections (user_id, chat_id, status) VALUES (?, ?, 'ok')"));//                     6
+        statements.add(conn.prepareStatement("INSERT INTO chat_connections (user_id, chat_id, status) VALUES (?, ?, ?)"));//                        6
         statements.add(conn.prepareStatement("INSERT INTO chat_connections (user_id, chat_id) VALUES (?, ?)"));//                                   7
         statements.add(conn.prepareStatement("INSERT INTO contacts (user_1, user_2, chat_id) VALUES (?, ?, ?)"));//                                 8
         statements.add(conn.prepareStatement("SELECT status FROM chat_connections WHERE user_id = ? AND chat_id = ?"));//                           9
@@ -61,6 +61,13 @@ ORDER BY message_id DESC LIMIT ?
         statements.add(conn.prepareStatement("UPDATE users SET last_online = NOW() WHERE username = ?"));//                                         16
         statements.add(conn.prepareStatement("SELECT username FROM (SELECT user_id FROM chat_connections WHERE chat_id = ? AND user_id != ? " + //  17
                 "AND status != 'block') cc JOIN users u ON cc.user_id = u.user_id"));
+        statements.add(conn.prepareStatement(//                                                                                                         18
+                """
+                SELECT a.name, a.message_id, u.username, a.date, a.message FROM
+                (SELECT c.name, um.message_id, um.sender, um.date, um.message FROM (SELECT chat_id, last_message_id, name FROM chats WHERE chat_id = ?) c
+                JOIN user_messages um ON c.chat_id = um.chat_id AND c.last_message_id = um.message_id WHERE NOT c.name IS NULL) a
+                JOIN users u ON a.sender = u.user_id
+                """));
     }
 
     public static void init(String password) throws SQLException{

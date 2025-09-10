@@ -1,5 +1,6 @@
 package com.github.rob269.helloMessengerServer.io;
 
+import com.github.rob269.helloMessengerServer.Chat;
 import com.github.rob269.helloMessengerServer.Main;
 import com.github.rob269.helloMessengerServer.Message;
 import com.github.rob269.helloMessengerServer.SideConnectionThread;
@@ -39,6 +40,7 @@ public class ClientIO {
         commands.put((byte) 54, "Chat was created");
         commands.put((byte) 55, "Message is successfully sent");
         commands.put((byte) 56, "Sending messages from database");
+        commands.put((byte) 57, "You joined the chat");
         commands.put((byte) 60, "Error");
         commands.put((byte) 61, "Authentication error");
         commands.put((byte) 62, "Chat already exist");
@@ -51,6 +53,7 @@ public class ClientIO {
         commands.put((byte) 69, "Chat is blocked");
         commands.put((byte) 70, "User blocked in this chat");
         commands.put((byte) 71, "Wrong params");
+        commands.put((byte) 72, "User already in the chat");
         commands.put((byte) 80, "Get chats");
         commands.put((byte) 81, "Create new private chat");
         commands.put((byte) 82, "Create new public chat");
@@ -222,7 +225,7 @@ public class ClientIO {
                 batch.write(privateChatsBuilder.toString());
                 batch.write(publicChatsBuilder.toString());
             }
-            case 81 -> {//Create new private chat
+            case 81 -> {//Create new private chat todo connect to exist chat
                 String recipient = readString(false);
                 if (username == null) {writeCommand(61); return;}
                 if (recipient.isEmpty()) {writeCommand(63); return;}
@@ -232,6 +235,7 @@ public class ClientIO {
                 if (dbLine.isEmpty()) {writeCommand(64); return;}
                 long dbRecipientId = Long.parseLong(dbLine.getFirst()[0]);
                 long chatId;
+                LocalDateTime localDateTime;
                 synchronized (ClientIO.class) {
                     List<String[]> contact = DatabaseInterface.sqlRead(5, 1, dbRecipientId, userId, userId, dbRecipientId);
                     if (!contact.isEmpty()) {
@@ -239,14 +243,18 @@ public class ClientIO {
                         return;
                     }
                     chatId = DatabaseInterface.createChat();
-                    DatabaseInterface.sqlWrite(6, userId, chatId);
+                    DatabaseInterface.sqlWrite(6, userId, chatId, "ok");
                     DatabaseInterface.sqlWrite(7, dbRecipientId, chatId);
                     DatabaseInterface.sqlWrite(8, userId, dbRecipientId, chatId);
-                    LocalDateTime localDateTime = LocalDateTime.now();
+                    localDateTime = roundDateTime(LocalDateTime.now());
                     DatabaseInterface.sqlWrite(11, (long) 0, chatId, (long) -1, "", localDateTime.toString());
                 }
                 HMPBatch batch = writeBatch(54, 1, false);
-                batch.write(chatId);
+                batch.write(chatId + "\\\\" + localDateTime + "\\\\;");
+                if (Main.onlineUsersThreads.containsKey(recipient)) {
+                    Main.onlineUsersThreads.get(recipient).newChat(new Chat(chatId, username,
+                            new Message(chatId, 0, "null", localDateTime, ""), true));
+                }
             }
             case 82 -> {//Create new public chat
                 String name = readString(false);
@@ -254,11 +262,11 @@ public class ClientIO {
                 if (name.isEmpty()) {writeCommand(63); return;}
                 if (name.contains("\\")) {writeCommand(65); return;}
                 long chatId = DatabaseInterface.createChat(name, userId);
-                DatabaseInterface.sqlWrite(6, userId, chatId);
-                LocalDateTime localDateTime = LocalDateTime.now();
+                DatabaseInterface.sqlWrite(6, userId, chatId, "ok");
+                LocalDateTime localDateTime = roundDateTime(LocalDateTime.now());
                 DatabaseInterface.sqlWrite(11, (long) 0, chatId, (long) -1, "", localDateTime.toString());
                 HMPBatch batch = writeBatch(54, 1, false);
-                batch.write(chatId);
+                batch.write(chatId + "\\\\" + localDateTime + "\\\\;");
             }
             case 83 -> {//Send message
                 long chatId = readLong(false);
@@ -280,8 +288,7 @@ public class ClientIO {
                 synchronized (ClientIO.class) {
                     dbLine = DatabaseInterface.sqlRead(10, 1,chatId);
                     messageId = Long.parseLong(dbLine.getFirst()[0]) + 1;
-                    localDateTime = LocalDateTime.now();
-                    localDateTime = localDateTime.getNano()<500000000L ? localDateTime.withNano(0) : localDateTime.withNano(0).plusSeconds(1);
+                    localDateTime = roundDateTime(LocalDateTime.now());
                     DatabaseInterface.sqlWrite(11, messageId, chatId, userId, message, localDateTime.toString());
                     DatabaseInterface.sqlWrite(12, messageId, chatId);
                 }
@@ -299,6 +306,7 @@ public class ClientIO {
             case 84 -> {//Get messages
                 long chatId = readLong(false);
                 String[] params = readString().split("\\\\");
+                if (username == null) {writeCommand(61); return;}
                 List<String[]> chatConnection = DatabaseInterface.sqlRead(9, 1, userId, chatId);
                 if (chatConnection.isEmpty()) {writeCommand(68); return;}
                 List<String[]> entries;
@@ -327,8 +335,26 @@ public class ClientIO {
             }
             case 86 -> {//Join the chat
                 long chatId = readLong(false);
+                List<String[]> dbLines = DatabaseInterface.sqlRead(9, 1, userId, chatId);
+                if (!dbLines.isEmpty()) {writeCommand(72); return;}
+                dbLines = DatabaseInterface.sqlRead(18, 5, chatId);
+                if (dbLines.isEmpty()) {writeCommand(67); return;}
+                DatabaseInterface.sqlWrite(6, userId, chatId, "ok");
+                StringBuilder builder = new StringBuilder();
+                String[] chat = dbLines.getFirst();
+                chat[4] = chat[4].replaceAll("\\\\", "\\\\&");
+                for (String string : chat) {
+                    builder.append(string).append("\\\\");
+                }
+                builder.append(";");
+                HMPBatch batch = writeBatch(57, 1, false);
+                batch.write(builder.toString());
             }
         }
+    }
+
+    private LocalDateTime roundDateTime(LocalDateTime localDateTime) {
+        return localDateTime.getNano()<500000000L ? localDateTime.withNano(0) : localDateTime.withNano(0).plusSeconds(1);
     }
 
     private static String sha256(String string) {
