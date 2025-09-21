@@ -4,7 +4,7 @@ import com.github.rob269.helloMessengerServer.Chat;
 import com.github.rob269.helloMessengerServer.Main;
 import com.github.rob269.helloMessengerServer.Message;
 import com.github.rob269.helloMessengerServer.SideConnectionThread;
-import com.github.rob269.helloMessengerServer.logging.ConsoleFormatter;
+import com.github.rob269.helloMessengerServer.logging.LogFormatter;
 import com.github.rob269.helloMessengerServer.rsa.Key;
 import com.github.rob269.helloMessengerServer.rsa.RSA;
 import com.github.rob269.helloMessengerServer.rsa.RSAServerKeys;
@@ -19,6 +19,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -87,7 +88,7 @@ public class ClientIO {
             router.start();
             LOGGER.fine("Output and Input streams is open");
         } catch (IOException e) {
-            LOGGER.warning("Can't open streams\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("Can't open streams\n" + LogFormatter.formatStackTrace(e));
         }
     }
 
@@ -119,7 +120,7 @@ public class ClientIO {
                 clientSocket.setSoTimeout(0);
                 clientSocket.setKeepAlive(true);
             } catch (SocketException e) {
-                LOGGER.warning("Socket exception\n" + ConsoleFormatter.formatStackTrace(e));
+                LOGGER.warning("Socket exception\n" + LogFormatter.formatStackTrace(e));
             }
         } else {
             LOGGER.warning("Fail initialization");
@@ -179,6 +180,7 @@ public class ClientIO {
                 Main.onlineUsersThreads.put(username, thread);
                 DatabaseInterface.sqlWrite(16, username);
                 writeCommand(52);
+                LOGGER.info("The user logged in under the username %s".formatted(username));
             }
             case 80 -> {//Get chats
                 if (username == null) {writeCommand(61); return;}
@@ -225,7 +227,7 @@ public class ClientIO {
                 batch.write(privateChatsBuilder.toString());
                 batch.write(publicChatsBuilder.toString());
             }
-            case 81 -> {//Create new private chat todo connect to exist chat
+            case 81 -> {//Create new private chat
                 String recipient = readString(false);
                 if (username == null) {writeCommand(61); return;}
                 if (recipient.isEmpty()) {writeCommand(63); return;}
@@ -250,7 +252,7 @@ public class ClientIO {
                     DatabaseInterface.sqlWrite(11, (long) 0, chatId, (long) -1, "", localDateTime.toString());
                 }
                 HMPBatch batch = writeBatch(54, 1, false);
-                batch.write(chatId + "\\\\" + localDateTime + "\\\\;");
+                batch.write(chatId + "\\\\" + localDateTime.format(Main.dateTimeFormatter) + "\\\\;");
                 if (Main.onlineUsersThreads.containsKey(recipient)) {
                     Main.onlineUsersThreads.get(recipient).newChat(new Chat(chatId, username,
                             new Message(chatId, 0, "null", localDateTime, ""), true));
@@ -266,7 +268,7 @@ public class ClientIO {
                 LocalDateTime localDateTime = roundDateTime(LocalDateTime.now());
                 DatabaseInterface.sqlWrite(11, (long) 0, chatId, (long) -1, "", localDateTime.toString());
                 HMPBatch batch = writeBatch(54, 1, false);
-                batch.write(chatId + "\\\\" + localDateTime + "\\\\;");
+                batch.write(chatId + "\\\\" + localDateTime.format(Main.dateTimeFormatter) + "\\\\;");
             }
             case 83 -> {//Send message
                 long chatId = readLong(false);
@@ -292,7 +294,7 @@ public class ClientIO {
                     DatabaseInterface.sqlWrite(11, messageId, chatId, userId, message, localDateTime.toString());
                     DatabaseInterface.sqlWrite(12, messageId, chatId);
                 }
-                String messageMeta = messageId + "\\\\" + localDateTime;
+                String messageMeta = messageId + "\\\\" + localDateTime.format(Main.dateTimeFormatter) + "\\\\;";
                 HMPBatch batch = writeBatch(55, 1, false);
                 batch.write(messageMeta);
                 dbLine = DatabaseInterface.sqlRead(17, 1, chatId, userId);
@@ -305,7 +307,7 @@ public class ClientIO {
             }
             case 84 -> {//Get messages
                 long chatId = readLong(false);
-                String[] params = readString().split("\\\\");
+                String[] params = readString().split("\\\\\\\\");
                 if (username == null) {writeCommand(61); return;}
                 List<String[]> chatConnection = DatabaseInterface.sqlRead(9, 1, userId, chatId);
                 if (chatConnection.isEmpty()) {writeCommand(68); return;}
@@ -331,7 +333,7 @@ public class ClientIO {
             case 85 -> {//Add user to the chat
                 long chatId = readLong(false);
                 String username = readString();
-
+                //todo
             }
             case 86 -> {//Join the chat
                 long chatId = readLong(false);
@@ -369,7 +371,7 @@ public class ClientIO {
             }
             return builder.toString();
         } catch (NoSuchAlgorithmException e) {
-            LOGGER.warning("SHA-256 algorithm exception:\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("SHA-256 algorithm exception:\n" + LogFormatter.formatStackTrace(e));
         }
         return null;
     }
@@ -449,7 +451,7 @@ public class ClientIO {
                     try {
                         router.mainThreadInput.wait();
                     } catch (InterruptedException e) {
-                        LOGGER.warning("Threads exception\n" + ConsoleFormatter.formatStackTrace(e));
+                        LOGGER.warning("Threads exception\n" + LogFormatter.formatStackTrace(e));
                     }
                 }
                 result = router.mainThreadInput.poll();
@@ -461,7 +463,7 @@ public class ClientIO {
                     try {
                         router.sideThreadInput.wait();
                     } catch (InterruptedException e) {
-                        LOGGER.warning("Threads exception\n" + ConsoleFormatter.formatStackTrace(e));
+                        LOGGER.warning("Threads exception\n" + LogFormatter.formatStackTrace(e));
                     }
                 }
                 result = router.sideThreadInput.poll();
@@ -501,7 +503,7 @@ public class ClientIO {
         return toReturn;
     }
 
-    protected synchronized void write(byte[] message, boolean sendCommand) throws IOException {
+    synchronized void write(byte[] message, boolean sendCommand) throws IOException {
         if (!isClosed) {
             LOGGER.finest("Sending byte message");
             try {
@@ -513,7 +515,7 @@ public class ClientIO {
                 dos.write(message);
                 dos.flush();
             } catch (IOException e) {
-                LOGGER.warning("Can't send the message\n" + ConsoleFormatter.formatStackTrace(e));
+                LOGGER.warning("Can't send the message\n" + LogFormatter.formatStackTrace(e));
             }
             return;
         }
@@ -531,7 +533,7 @@ public class ClientIO {
             router.close();
             LOGGER.fine("ClientIO closed");
         } catch (IOException e) {
-            LOGGER.warning("ClientIO closing exception\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("ClientIO closing exception\n" + LogFormatter.formatStackTrace(e));
         }
     }
 }

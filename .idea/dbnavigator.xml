@@ -33,6 +33,13 @@
     <filter-actions connection-id="92a1c38c-7280-48a6-8ef3-8b14e755c834" dataset="hello_messenger_db.user_rsa_keys" active-filter-id="EMPTY_FILTER" />
     <filter-actions connection-id="92a1c38c-7280-48a6-8ef3-8b14e755c834" dataset="hello_messenger_db.users" active-filter-id="EMPTY_FILTER" />
     <filter-actions connection-id="92a1c38c-7280-48a6-8ef3-8b14e755c834" dataset="hello_messenger_db.user_messages" active-filter-id="EMPTY_FILTER" />
+    <filter-actions connection-id="92a1c38c-7280-48a6-8ef3-8b14e755c834" dataset="hello_messenger_db.chats" active-filter-id="EMPTY_FILTER" />
+  </component>
+  <component name="DBNavigator.Project.ExecutionManager">
+    <retain-sticky-names value="false" />
+  </component>
+  <component name="DBNavigator.Project.FileConnectionMappingManager">
+    <mapping file-url="file://$PROJECT_DIR$/SQL/requestMessagesFromChat.sql" connection-id="92a1c38c-7280-48a6-8ef3-8b14e755c834" session-id="MAIN" current-schema="hello_messenger_db" />
   </component>
   <component name="DBNavigator.Project.ObjectQuickFilterManager">
     <last-used-operator value="EQUAL" />
@@ -529,5 +536,9 @@
         </visibility-settings>
       </environment>
     </general-settings>
+  </component>
+  <component name="DBNavigator.Project.StatementExecutionManager">
+    <execution-variables />
+    <execution-variable-types />
   </component>
 </project>

@@ -3,7 +3,7 @@ package com.github.rob269.helloMessengerServer;
 import com.github.rob269.helloMessengerServer.io.ClientIO;
 import com.github.rob269.helloMessengerServer.io.DatabaseInterface;
 import com.github.rob269.helloMessengerServer.io.ResourcesIO;
-import com.github.rob269.helloMessengerServer.logging.ConsoleFormatter;
+import com.github.rob269.helloMessengerServer.logging.LogFormatter;
 import com.github.rob269.helloMessengerServer.logging.LogFilter;
 import com.github.rob269.helloMessengerServer.rsa.Guarantor;
 import com.github.rob269.helloMessengerServer.rsa.Key;
@@ -15,6 +15,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.sql.SQLException;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -22,6 +23,7 @@ import java.util.logging.Logger;
 //Server
 public class Main {
     public volatile static Map<String, SideConnectionThread> onlineUsersThreads = new HashMap<>();
+    public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static ServerSocket serverSocket;
     static {
         System.setErr(new PrintStream(new LogFilter(System.err)));
@@ -39,7 +41,7 @@ public class Main {
     }
     private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
 
-    private static void parseConfigFile() throws SQLException {
+    private static void parseConfigFile() {
         if (!ResourcesIO.isExist("config")) {
             ResourcesIO.write("config", new ArrayList<>());
             LOGGER.severe("The configuration file does not exists");
@@ -47,7 +49,6 @@ public class Main {
         }
         BigInteger[] publicKey = null;
         BigInteger[] privateKey = null;
-        String dbRootPassword = null;
         StringBuilder builder = new StringBuilder();
         for (String line : ResourcesIO.read("config")) builder.append(line);
         String[] configs = builder.toString().replaceAll(" ", "").split(";");
@@ -60,12 +61,8 @@ public class Main {
                 String[] key = config.split("=")[1].split(",");
                 publicKey = new BigInteger[]{new BigInteger(key[0]), new BigInteger(key[1])};
             }
-            else if (config.startsWith("db_root_password")) {
-                dbRootPassword = config.split("=")[1];
-            }
         }
-        if (publicKey != null && privateKey != null && dbRootPassword != null) {
-            DatabaseInterface.init(dbRootPassword);
+        if (publicKey != null && privateKey != null) {
             Guarantor.init(new Key(publicKey), new Key(privateKey));
         }
         else {
@@ -75,8 +72,9 @@ public class Main {
     }
 
     public static void main(String[] args) {
+        parseConfigFile();
         try {
-            parseConfigFile();
+            DatabaseInterface.init();
         } catch (SQLException e) {
             LOGGER.warning("Can't connect to database");
             throw new RuntimeException(e);
@@ -98,17 +96,17 @@ public class Main {
                 }
             }
         } catch (IOException e) {
-            LOGGER.warning("Server can't start\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("Server can't start\n" + LogFormatter.formatStackTrace(e));
         }
     }
 
-    protected static void shutdownTheServer() {
+    public static void shutdownTheServer() {
         Thread.currentThread().interrupt();
         if (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 serverSocket.close();
             } catch (IOException e) {
-                LOGGER.warning("Close exception\n" + ConsoleFormatter.formatStackTrace(e));
+                LOGGER.warning("Close exception\n" + LogFormatter.formatStackTrace(e));
             }
         }
     }
@@ -142,7 +140,7 @@ class ConnectionThread extends Thread {
             try {
                 clientSocket.close();
             } catch (IOException e) {
-                LOGGER.warning("Socket closing exception\n" + ConsoleFormatter.formatStackTrace(e));
+                LOGGER.warning("Socket closing exception\n" + LogFormatter.formatStackTrace(e));
             }
         }
     }

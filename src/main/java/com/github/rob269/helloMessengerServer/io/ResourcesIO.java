@@ -1,6 +1,6 @@
 package com.github.rob269.helloMessengerServer.io;
 
-import com.github.rob269.helloMessengerServer.logging.ConsoleFormatter;
+import com.github.rob269.helloMessengerServer.logging.LogFormatter;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -13,7 +13,6 @@ import java.util.logging.Logger;
 public class ResourcesIO {
     private static final Logger LOGGER = Logger.getLogger(ResourcesIO.class.getName());
     public static final String RESOURCES_FOLDER = "resources/";
-    public static final String EXTENSION = ".json";
 
     public static List<String> read(String filePath) {
         List<String> lines = new ArrayList<>();
@@ -52,7 +51,7 @@ public class ResourcesIO {
             try {
                 file.createNewFile();
             } catch (IOException e) {
-                LOGGER.warning("Can't create new file (" + filePath + ")\n" + ConsoleFormatter.formatStackTrace(e));
+                LOGGER.warning("Can't create new file (" + filePath + ")\n" + LogFormatter.formatStackTrace(e));
             }
         }
         try {

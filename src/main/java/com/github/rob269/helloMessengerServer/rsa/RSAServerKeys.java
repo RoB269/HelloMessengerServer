@@ -12,9 +12,9 @@ public class RSAServerKeys {
     private static final Logger LOGGER = Logger.getLogger(RSAServerKeys.class.getName());
 
     public static void initKeys() {
-        if (ResourcesIO.isExist("RSA/serverKeys" + ResourcesIO.EXTENSION)) {
+        if (ResourcesIO.isExist("RSA/serverKeys.json")) {
             try {
-                RSAKeysPair serverKeys = ResourcesIO.readJSON("RSA/serverKeys" + ResourcesIO.EXTENSION, RSAKeysPair.class);
+                RSAKeysPair serverKeys = ResourcesIO.readJSON("RSA/serverKeys.json", RSAKeysPair.class);
                 if (serverKeys == null || serverKeys.getAdmin() == null) {
                     throw new NullPointerException();
                 }
@@ -33,7 +33,7 @@ public class RSAServerKeys {
     private static void generateNewKeys() {
         BigInteger[][] keys = RSA.generateKeys();
         RSAServerKeys.serverKeys = new RSAKeysPair(keys, SERVER);
-        ResourcesIO.writeJSON("RSA/serverKeys" + ResourcesIO.EXTENSION, serverKeys);
+        ResourcesIO.writeJSON("RSA/serverKeys.json", serverKeys);
         LOGGER.fine("The keys were generated and written into the key's file");
     }
 

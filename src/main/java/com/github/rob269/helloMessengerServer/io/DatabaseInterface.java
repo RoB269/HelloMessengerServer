@@ -1,6 +1,6 @@
 package com.github.rob269.helloMessengerServer.io;
 
-import com.github.rob269.helloMessengerServer.logging.ConsoleFormatter;
+import com.github.rob269.helloMessengerServer.logging.LogFormatter;
 
 import java.sql.*;
 import java.util.*;
@@ -8,9 +8,7 @@ import java.util.logging.Logger;
 
 public class DatabaseInterface {
     public static final Logger LOGGER = Logger.getLogger(DatabaseInterface.class.getName());
-    private static final String userName = "root";
-    private static String password = null;
-    private static final String url = "jdbc:mysql://127.0.0.1:3306/hello_messenger_db?allowMultiQueries=true";
+    private static String url = null;
     private static Connection conn;
     private static final List<PreparedStatement> statements = new ArrayList<>();
     private static void createStatements() throws SQLException {
@@ -70,10 +68,17 @@ ORDER BY message_id DESC LIMIT ?
                 """));
     }
 
-    public static void init(String password) throws SQLException{
-        if (DatabaseInterface.password == null) {
-            DatabaseInterface.password = password;
-            conn = DriverManager.getConnection(url, userName, password);
+    public static void init() throws SQLException {
+        if (url == null) {
+            String envUrl = System.getenv("DATABASE_URL");
+            if (envUrl == null) {
+                LOGGER.warning("DATABASE_URL not set");
+                url = "jdbc:mysql://root:root@127.0.0.1:3306/hello_messenger_db?allowMultiQueries=true";
+            }
+            else {
+                url = "jdbc:" + envUrl + "?allowMultiQueries=true";
+            }
+            conn = DriverManager.getConnection(url);
             createStatements();
             LOGGER.warning("Database connected");
         }
@@ -95,7 +100,7 @@ ORDER BY message_id DESC LIMIT ?
             }
             return sqlRead(statement, responseSize);
         } catch (SQLException e) {
-            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("SQL exception\n" + LogFormatter.formatStackTrace(e));
             throw e;
         }
     }
@@ -113,7 +118,7 @@ ORDER BY message_id DESC LIMIT ?
             }
             sqlWrite(statement);
         } catch (SQLException e) {
-            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("SQL exception\n" + LogFormatter.formatStackTrace(e));
             throw e;
         }
     }
@@ -123,7 +128,7 @@ ORDER BY message_id DESC LIMIT ?
         try {
             statement.executeUpdate();
         } catch (SQLException e) {
-            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("SQL exception\n" + LogFormatter.formatStackTrace(e));
             throw e;
         }
     }
@@ -142,12 +147,13 @@ ORDER BY message_id DESC LIMIT ?
                 entries.add(line);
             }
         } catch (SQLException e) {
-            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("SQL exception\n" + LogFormatter.formatStackTrace(e));
             throw e;
         }
         return entries;
     }
 
+    @Deprecated
     public static synchronized List<String[]> sqlRead(String sql, int responseSize) {
         LOGGER.finest("SQL read request");
         List<String[]> strings = new ArrayList<>();
@@ -161,18 +167,18 @@ ORDER BY message_id DESC LIMIT ?
                 strings.add(line);
             }
         } catch (SQLException e) {
-            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("SQL exception\n" + LogFormatter.formatStackTrace(e));
         }
         return strings;
     }
 
+    @Deprecated
     public static synchronized void sqlWrite(String sql) {
         LOGGER.finest("SQL write request");
-        try (Connection conn = DriverManager.getConnection(url, userName, password);
-             Statement statement = conn.createStatement()){
+        try (Statement statement = conn.createStatement()){
             statement.executeUpdate(sql);
         } catch (SQLException e) {
-            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("SQL exception\n" + LogFormatter.formatStackTrace(e));
         }
     }
 
@@ -198,7 +204,7 @@ ORDER BY message_id DESC LIMIT ?
             chat_id = set.getLong(1);
             return chat_id;
         } catch (SQLException e) {
-            LOGGER.warning("SQL exception\n" + ConsoleFormatter.formatStackTrace(e));
+            LOGGER.warning("SQL exception\n" + LogFormatter.formatStackTrace(e));
             throw e;
         }
     }

@@ -49,14 +49,13 @@ public class SideConnectionThread extends Thread {
 
     private String formatMessage(Message message) {
         return message.getChatId() + "\\\\" + message.getMessageId() + "\\\\" + message.getSender() + "\\\\" +
-                message.getDate() + "\\\\" + message.getMessage().replaceAll("\\\\", "\\\\&") + "\\\\" +
-                ";";
+                message.getDate().format(Main.dateTimeFormatter) + "\\\\" + message.getMessage().replaceAll("\\\\", "\\\\&") + "\\\\;";
     }
 
     private String formatChat(Chat chat) {
         Message message = chat.lastMessage();
         return chat.chatId() + "\\\\" + chat.name() + "\\\\" + message.getMessageId() + "\\\\" + message.getSender() +
-                "\\\\" + message.getDate() + "\\\\" + message.getMessage().replaceAll("\\\\", "\\\\&") + "\\\\" + (chat.isPrivate() ? "1" : "0") + "\\\\;";
+                "\\\\" + message.getDate().format(Main.dateTimeFormatter) + "\\\\" + message.getMessage().replaceAll("\\\\", "\\\\&") + "\\\\" + (chat.isPrivate() ? "1" : "0") + "\\\\;";
     }
 
     @Override

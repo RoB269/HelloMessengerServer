@@ -16,7 +16,7 @@ public class Guarantor {
         return publicKey;
     }
 
-    protected static Key getPrivateKey() {
+    static Key getPrivateKey() {
         return privateKey;
     }
 }
