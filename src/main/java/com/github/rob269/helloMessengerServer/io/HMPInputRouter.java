@@ -8,14 +8,14 @@ import java.io.IOException;
 import java.util.*;
 import java.util.logging.Logger;
 
-public class InputRouter extends Thread {
-    private static final Logger LOGGER = Logger.getLogger(InputRouter.class.getName());
+public class HMPInputRouter extends Thread {
+    private static final Logger LOGGER = Logger.getLogger(HMPInputRouter.class.getName());
     private final DataInputStream dis;
-    private final ClientIO clientIO;
+    private final HMPClientIO clientIO;
     public final Deque<byte[]> mainThreadInput = new ArrayDeque<>();
     public final Deque<byte[]> sideThreadInput = new ArrayDeque<>();
 
-    public InputRouter(DataInputStream dis, ClientIO clientIO) {
+    public HMPInputRouter(DataInputStream dis, HMPClientIO clientIO) {
         this.dis = dis;
         this.clientIO = clientIO;
     }

@@ -4,16 +4,16 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.logging.Logger;
 
-public class HMPBatch {
+public class HMPBatch implements Batch {
     private static final Logger LOGGER = Logger.getLogger(HMPBatch.class.getName());
     private final byte command;
-    private final ClientIO clientIO;
+    private final HMPClientIO clientIO;
     private final int maxSize;
     private int size = 0;
     private final byte[][] batch;
     private String[] logs = null;
 
-    public HMPBatch(byte command, ClientIO clientIO, int size, boolean log) {
+    public HMPBatch(byte command, HMPClientIO clientIO, int size, boolean log) {
         this.command = command;
         this.clientIO = clientIO;
         this.maxSize = size;
@@ -54,7 +54,7 @@ public class HMPBatch {
         }
     }
 
-    public void write(byte[] message) throws IOException{
+    public void write(byte[] message) throws IOException {
         batch[size] = message;
         size++;
         if (size == maxSize) {

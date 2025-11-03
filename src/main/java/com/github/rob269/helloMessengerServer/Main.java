@@ -1,6 +1,7 @@
 package com.github.rob269.helloMessengerServer;
 
 import com.github.rob269.helloMessengerServer.io.ClientIO;
+import com.github.rob269.helloMessengerServer.io.HMPClientIO;
 import com.github.rob269.helloMessengerServer.io.DatabaseInterface;
 import com.github.rob269.helloMessengerServer.io.ResourcesIO;
 import com.github.rob269.helloMessengerServer.logging.LogFormatter;
@@ -127,7 +128,7 @@ class ConnectionThread extends Thread {
         ClientIO clientIO = null;
         try {
             clientSocket.setSoTimeout(3_000);
-            clientIO = new ClientIO(clientSocket);
+            clientIO = new HMPClientIO(clientSocket);
             clientIO.init();
         } catch (SocketException e) {
             LOGGER.warning("Time out exception");
@@ -136,6 +137,9 @@ class ConnectionThread extends Thread {
             throw new RuntimeException(e);
         } finally {
             if (clientIO != null && !clientIO.isClosed()) clientIO.close();
+            if (clientIO != null && clientIO.getUsername() != null) {
+                Main.onlineUsersThreads.remove(clientIO.getUsername()).interrupt();
+            }
             LOGGER.info(clientSocket.getInetAddress() + " disconnected");
             try {
                 clientSocket.close();

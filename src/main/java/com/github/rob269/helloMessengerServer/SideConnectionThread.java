@@ -1,5 +1,6 @@
 package com.github.rob269.helloMessengerServer;
 
+import com.github.rob269.helloMessengerServer.io.Batch;
 import com.github.rob269.helloMessengerServer.io.ClientIO;
 import com.github.rob269.helloMessengerServer.io.HMPBatch;
 
@@ -68,11 +69,11 @@ public class SideConnectionThread extends Thread {
                     }
                     switch (command) {
                         case -10 -> {
-                            HMPBatch batch = clientIO.writeBatch(-10, 1, false);
+                            Batch batch = clientIO.writeBatch(-10, 1, false);
                             batch.write(formatMessage(newMessage));
                         }
                         case -11 -> {
-                            HMPBatch batch = clientIO.writeBatch(-11, 1, false);
+                            Batch batch = clientIO.writeBatch(-11, 1, false);
                             batch.write(formatChat(chat));
                         }
                     }
