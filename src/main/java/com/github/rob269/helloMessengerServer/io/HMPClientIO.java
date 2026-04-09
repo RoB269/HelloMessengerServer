@@ -4,6 +4,8 @@ import com.github.rob269.helloMessengerServer.*;
 import com.github.rob269.helloMessengerServer.logging.LogFormatter;
 import com.github.rob269.helloMessengerServer.rsa.Key;
 import com.github.rob269.helloMessengerServer.rsa.RSA;
+import com.github.rob269.helloMessengerServer.rsa.RSAServerKeys;
+import com.github.rob269.helloMessengerServer.rsa.UserKey;
 
 import java.io.*;
 import java.math.BigInteger;
@@ -18,8 +20,8 @@ public class HMPClientIO implements ClientIO {
     static {
         commands.put((byte) -10, "Sending new message");
         commands.put((byte) -11, "Sending new chat");
-        commands.put((byte) 0, "Exit");
-        commands.put((byte) 99, "Exit");
+        commands.put((byte) 0, "Disconnect");
+        commands.put((byte) 99, "Disconnect");
         commands.put((byte) 10, "Get Server public key");
         commands.put((byte) 20, "User sending his public key");
         commands.put((byte) 21, "Login");
@@ -52,7 +54,7 @@ public class HMPClientIO implements ClientIO {
         commands.put((byte) 84, "Get messages");
         commands.put((byte) 85, "Add user to the chat");
         commands.put((byte) 86, "Join the chat");
-        commands.put((byte) 90, "Ping");    
+        commands.put((byte) 90, "Ping");
     }
     private Socket clientSocket;
     private DataOutputStream dos;
@@ -93,8 +95,29 @@ public class HMPClientIO implements ClientIO {
             byte request = readCommand();
             if (!isClosed) {
                 if (initialized) endpoints.handleRequest(request);
-                else endpoints.handleInitialRequest(request);
+                else handleInitialRequest(request);
             }
+        }
+    }
+
+    private void handleInitialRequest(byte request) throws IOException {
+        switch (request) {
+            case 10 -> {//Get rsa keys
+                UserKey userKey = RSAServerKeys.getPublicKey();
+                BigInteger[] key = userKey.getKey();
+                BigInteger[] meta = userKey.getMeta();
+                Batch batch = writeBatch(51, 5, true);
+                for (BigInteger integer : key) batch.write(integer);
+                for (BigInteger integer : meta) batch.write(integer);
+                batch.write(userKey.getUser().getUsername());
+            }
+            case 20 -> {//Key
+                BigInteger[] key = new BigInteger[2];
+                for (int i = 0; i < 2; i++) key[i] = readBigint();
+                Key clientKey = new Key(key);
+                initClientKey(clientKey);
+            }
+            case 0 -> close();
         }
     }
 
@@ -103,7 +126,6 @@ public class HMPClientIO implements ClientIO {
         return username;
     }
 
-    @Override
     public void initClientKey(Key clientKey) throws IOException {
         this.clientKey = clientKey;
         LOGGER.fine("User's key was received");
@@ -252,7 +274,6 @@ public class HMPClientIO implements ClientIO {
             LOGGER.finest("Sending byte message");
             try {
                 if (initialized) message = RSA.encodeByteArray(message, clientKey);
-
                 if (sendCommand) dos.writeByte(message.length);
                 else dos.writeInt(message.length);
 
@@ -288,7 +309,7 @@ public class HMPClientIO implements ClientIO {
 /*
 Handshake codes:
 Requests:
-     0 - Exit
+     0 - Disconnect
     10 - Get Server public key -
     20 - User sending his public key +
 
@@ -309,7 +330,7 @@ Requests:
     82 - Create new public chat
     83 - Send message
     90 - Ping
-    99 - Exit
+    99 - Disconnect
 Responses:
     50 - OK
     53 - Sending chats

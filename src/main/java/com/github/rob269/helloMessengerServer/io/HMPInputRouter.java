@@ -44,14 +44,14 @@ public class HMPInputRouter extends Thread {
 
                 if (command >= 0) {
                     mainThreadInput.add(new byte[]{(byte) command});
-                    readPackage(input, mainThreadInput);
+                    readPackages(input, mainThreadInput);
                     synchronized (mainThreadInput) {
                         mainThreadInput.notify();
                     }
                 }
                 else {
                     sideThreadInput.add(new byte[]{(byte) command});
-                    readPackage(input, sideThreadInput);
+                    readPackages(input, sideThreadInput);
                     synchronized (sideThreadInput) {
                         sideThreadInput.notify();
                     }
@@ -68,7 +68,7 @@ public class HMPInputRouter extends Thread {
         LOGGER.fine("Input router closed");
     }
 
-    private void readPackage(byte[] input, Deque<byte[]> deque) throws IOException {
+    private void readPackages(byte[] input, Deque<byte[]> deque) throws IOException {
         if (input.length > 1) {
             for (int i = 0, packages = byteArrayToInt(input); i < packages; i++) {
                 int byteLength = dis.readInt();

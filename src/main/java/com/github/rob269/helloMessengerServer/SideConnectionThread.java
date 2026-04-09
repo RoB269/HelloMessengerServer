@@ -2,7 +2,6 @@ package com.github.rob269.helloMessengerServer;
 
 import com.github.rob269.helloMessengerServer.io.Batch;
 import com.github.rob269.helloMessengerServer.io.ClientIO;
-import com.github.rob269.helloMessengerServer.io.HMPBatch;
 
 import java.io.IOException;
 import java.util.logging.Logger;

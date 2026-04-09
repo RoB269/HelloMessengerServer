@@ -7,9 +7,9 @@ import java.math.BigInteger;
 import java.util.logging.Logger;
 
 public class RSAServerKeys {
+    private static final Logger LOGGER = Logger.getLogger(RSAServerKeys.class.getName());
     private static RSAKeysPair serverKeys;
     private static final User SERVER = new User("#SERVER#");
-    private static final Logger LOGGER = Logger.getLogger(RSAServerKeys.class.getName());
 
     public static void initKeys() {
         if (ResourcesIO.isExist("RSA/serverKeys.json")) {

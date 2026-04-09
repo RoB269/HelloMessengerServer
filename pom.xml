@@ -51,5 +51,6 @@
                 </executions>
             </plugin>
         </plugins>
+        <finalName>HelloMessengerServer</finalName>
     </build>
 </project>

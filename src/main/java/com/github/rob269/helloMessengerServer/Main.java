@@ -3,15 +3,10 @@ package com.github.rob269.helloMessengerServer;
 import com.github.rob269.helloMessengerServer.io.ClientIO;
 import com.github.rob269.helloMessengerServer.io.HMPClientIO;
 import com.github.rob269.helloMessengerServer.io.DatabaseInterface;
-import com.github.rob269.helloMessengerServer.io.ResourcesIO;
 import com.github.rob269.helloMessengerServer.logging.LogFormatter;
 import com.github.rob269.helloMessengerServer.logging.LogFilter;
-import com.github.rob269.helloMessengerServer.rsa.Guarantor;
-import com.github.rob269.helloMessengerServer.rsa.Key;
-import com.github.rob269.helloMessengerServer.rsa.RSAServerKeys;
 
 import java.io.*;
-import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -26,6 +21,7 @@ public class Main {
     public volatile static Map<String, SideConnectionThread> onlineUsersThreads = new HashMap<>();
     public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static ServerSocket serverSocket;
+    private static int port = -1;
     static {
         System.setErr(new PrintStream(new LogFilter(System.err)));
         File logsDir = new File("log/");
@@ -42,47 +38,21 @@ public class Main {
     }
     private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
 
-    private static void parseConfigFile() {
-        if (!ResourcesIO.isExist("config")) {
-            ResourcesIO.write("config", new ArrayList<>());
-            LOGGER.severe("The configuration file does not exists");
-            throw new RuntimeException();
-        }
-        BigInteger[] publicKey = null;
-        BigInteger[] privateKey = null;
-        StringBuilder builder = new StringBuilder();
-        for (String line : ResourcesIO.read("config")) builder.append(line);
-        String[] configs = builder.toString().replaceAll(" ", "").split(";");
-        for (String config : configs) {
-            if (config.startsWith("guarantor_private_key")) {
-                String[] key = config.split("=")[1].split(",");
-                privateKey = new BigInteger[]{new BigInteger(key[0]), new BigInteger(key[1])};
-            }
-            else if (config.startsWith("guarantor_public_key")) {
-                String[] key = config.split("=")[1].split(",");
-                publicKey = new BigInteger[]{new BigInteger(key[0]), new BigInteger(key[1])};
-            }
-        }
-        if (publicKey != null && privateKey != null) {
-            Guarantor.init(new Key(publicKey), new Key(privateKey));
-        }
-        else {
-            LOGGER.severe("The configuration file does not contain the necessary data");
-            throw new RuntimeException();
-        }
+    public static void setPort(int val) {
+        if (port == -1) port = val;
     }
 
     public static void main(String[] args) {
-        parseConfigFile();
+        new HMPConfig().parseConfigFiles();
+        setPort(5099);
         try {
-            DatabaseInterface.init();
+            DatabaseInterface.connect();
         } catch (SQLException e) {
             LOGGER.warning("Can't connect to database");
             throw new RuntimeException(e);
         }
-        RSAServerKeys.initKeys();
         try {
-            serverSocket = new ServerSocket(5099);
+            serverSocket = new ServerSocket(port);
             LOGGER.warning("The server is running");
             while (!Thread.currentThread().isInterrupted()) {
                 try {

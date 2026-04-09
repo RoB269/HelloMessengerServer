@@ -1,15 +1,11 @@
 package com.github.rob269.helloMessengerServer.io;
 
-import com.github.rob269.helloMessengerServer.rsa.Key;
-
 import java.io.IOException;
 import java.math.BigInteger;
 import java.sql.SQLException;
 
 public interface ClientIO {
     void init() throws IOException, SQLException;
-
-    void initClientKey(Key clientKey) throws IOException;
 
     BigInteger readBigint() throws IOException;
 

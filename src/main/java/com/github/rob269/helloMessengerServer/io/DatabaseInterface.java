@@ -1,6 +1,7 @@
 package com.github.rob269.helloMessengerServer.io;
 
 import com.github.rob269.helloMessengerServer.logging.LogFormatter;
+import com.mysql.cj.jdbc.exceptions.CommunicationsException;
 
 import java.sql.*;
 import java.util.*;
@@ -68,15 +69,15 @@ ORDER BY message_id DESC LIMIT ?
                 """));
     }
 
-    public static void init() throws SQLException {
+    public static void connect() throws SQLException {
         if (url == null) {
             String envUrl = System.getenv("DATABASE_URL");
             if (envUrl == null) {
                 LOGGER.warning("DATABASE_URL not set");
-                url = "jdbc:mysql://root:root@127.0.0.1:3306/hello_messenger_db?allowMultiQueries=true";
+                url = "jdbc:mysql://root:root@127.0.0.1:3306/hello_messenger_db?allowMultiQueries=true&autoReconnect=true";
             }
             else {
-                url = "jdbc:" + envUrl + "?allowMultiQueries=true";
+                url = "jdbc:" + envUrl + "?allowMultiQueries=true&autoReconnect=true";
             }
             conn = DriverManager.getConnection(url);
             createStatements();

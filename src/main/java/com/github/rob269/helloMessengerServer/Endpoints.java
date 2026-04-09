@@ -3,14 +3,9 @@ package com.github.rob269.helloMessengerServer;
 import com.github.rob269.helloMessengerServer.io.Batch;
 import com.github.rob269.helloMessengerServer.io.ClientIO;
 import com.github.rob269.helloMessengerServer.io.DatabaseInterface;
-import com.github.rob269.helloMessengerServer.io.HMPBatch;
 import com.github.rob269.helloMessengerServer.logging.LogFormatter;
-import com.github.rob269.helloMessengerServer.rsa.Key;
-import com.github.rob269.helloMessengerServer.rsa.RSAServerKeys;
-import com.github.rob269.helloMessengerServer.rsa.UserKey;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -34,7 +29,7 @@ public class Endpoints {
     public void handleRequest(byte request) throws IOException, SQLException {
         switch (request) {
             case 90 -> clientIO.writeCommand(90);//Ping
-            case 0, 99 -> clientIO.close();//Exit
+            case 0, 99 -> clientIO.close();//Disconnect
             case 21 -> {//Login
                 String username = clientIO.readString();
                 String password = clientIO.readString(false);
@@ -257,26 +252,5 @@ public class Endpoints {
             LOGGER.warning("SHA-256 algorithm exception:\n" + LogFormatter.formatStackTrace(e));
         }
         return null;
-    }
-
-    public void handleInitialRequest(byte request) throws IOException {
-        switch (request) {
-            case 10 -> {//Get rsa keys
-                UserKey userKey = RSAServerKeys.getPublicKey();
-                BigInteger[] key = userKey.getKey();
-                BigInteger[] meta = userKey.getMeta();
-                Batch batch = clientIO.writeBatch(51, 5, true);
-                for (BigInteger integer : key) batch.write(integer);
-                for (BigInteger integer : meta) batch.write(integer);
-                batch.write(userKey.getUser().getUsername());
-            }
-            case 20 -> {//Key
-                BigInteger[] key = new BigInteger[2];
-                for (int i = 0; i < 2; i++) key[i] = clientIO.readBigint();
-                Key clientKey = new Key(key);
-                clientIO.initClientKey(clientKey);
-            }
-            case 0 -> clientIO.close();
-        }
     }
 }
